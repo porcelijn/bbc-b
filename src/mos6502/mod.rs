@@ -1,14 +1,19 @@
+mod registers;
+use registers::Registers;
+
 pub struct CPU {
+  registers: Registers,
   cycles: u64,
 }
 
 impl CPU {
   pub fn new() -> Self {
-    CPU { cycles: 0 }
+    CPU { registers: Registers::new(), cycles: 0 }
   }
 
   pub fn step(&mut self, ticks: u64) {
     while self.cycles < ticks {
+      self.registers.pc += 1;
       self.cycles += 1;
     }
   }
