@@ -1,6 +1,7 @@
 mod registers;
 use registers::Registers;
 
+#[derive(Debug)]
 pub struct CPU {
   registers: Registers,
   cycles: u64,

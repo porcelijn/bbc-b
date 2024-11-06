@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Registers {
   pub a: u8,   // accumulator
   pub x: u8,
