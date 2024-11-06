@@ -1,4 +1,5 @@
 mod mos6502;
+mod memory;
 use mos6502::CPU;
 fn main() {
   println!("My first BBC-B emulator");

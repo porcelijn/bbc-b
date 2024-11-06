@@ -14,7 +14,7 @@ impl CPU {
 
   pub fn step(&mut self, ticks: u64) {
     while self.cycles < ticks {
-      self.registers.pc += 1;
+      self.registers.pc.inc_by(1);
       self.cycles += 1;
     }
   }
