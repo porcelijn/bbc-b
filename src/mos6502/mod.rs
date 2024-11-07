@@ -1,6 +1,6 @@
 mod addressing_modes;
 mod alu;
-pub mod instructions;
+mod instructions;
 mod registers;
 
 use registers::Registers;

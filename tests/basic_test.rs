@@ -1,54 +1,6 @@
 
 use bbc_b::mos6502::{CPU, stop_when};
-use bbc_b::mos6502::instructions::Instruction;
-use bbc_b::memory::{Address, MemoryBus, ram::RAM, slice};
-
-#[test]
-fn step_by_step() {
-  let mut cpu = CPU::new();
-  let mut mem = RAM::new();
-  let addr = Address::from(0);
- 
-  mem.write(addr, 0x69); // ADC #0xFF
-  mem.write(addr.next(), 0xFF);
-  mem.write(addr.next().next(), 0x65); // ADC &0x00 (=0x69)
-
-  assert_eq!(cpu.registers.a, 0);
-  assert!(!cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 0);
-  let inst = Instruction::lookup(mem.read(addr));
-  inst.execute(&mut cpu.registers, &mut mem);
-  assert_eq!(cpu.registers.a, 0xFF);
-  assert!(!cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 2);
-
-  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
-  inst.execute(&mut cpu.registers, &mut mem);
-  assert_eq!(cpu.registers.a, 0x68);
-  assert!(cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 4);
-
-  cpu.registers.pc = addr; // reset; add 0xFF + carry
-  assert_eq!(cpu.registers.a, 0x68);
-  assert!(cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 0);
-  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
-  inst.execute(&mut cpu.registers, &mut mem);
-  assert_eq!(cpu.registers.a, 0x68);
-  assert!(cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 2);
-
-  cpu.registers.pc = addr; // reset; add 0xFF without carry
-  cpu.registers.p.set::<'C'>(false);
-  assert_eq!(cpu.registers.a, 0x68);
-  assert!(!cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 0);
-  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
-  inst.execute(&mut cpu.registers, &mut mem);
-  assert_eq!(cpu.registers.a, 0x67); // 0x68 - 1
-  assert!(cpu.registers.p.has::<'C'>());
-  assert_eq!(cpu.registers.pc.to_u16(), 2);
-}
+use bbc_b::memory::{Address, ram::RAM};
 
 #[test]
 fn test_program() {
@@ -112,3 +64,34 @@ fn test_program() {
   assert!(regs.p.has::<'Z'>());
 }
 
+#[test]
+fn another_test() {
+  // addr instr     disass        |AC XR YR SP|nvdizc|#
+  // EB14 38        SEC           |C0 07 00 F9|000111|2
+  // EB15 E9 40     SBC #$40      |80 07 00 F9|100101|2
+  // EB17 4A        LSR A         |40 07 00 F9|000100|2
+  let mut ram = RAM::new();
+  let start = Address::from(0xEB14);
+  ram.load_at(&[ 0x38, 0xE9, 0x40, 0x4A ], start);
+  let mut cpu = CPU::new();
+  cpu.registers.a = 0xC0;
+  cpu.registers.pc = start;
+  cpu.registers.p.set::<'I'>(true);
+  cpu.registers.p.set::<'Z'>(true);
+  assert_eq!(cpu.registers.p.has::<'C'>(), false);
+  cpu.step(&mut ram); // SEC
+  assert_eq!(cpu.registers.p.has::<'C'>(), true);
+  cpu.step(&mut ram);
+  assert_eq!(cpu.registers.a, 0x80);
+  assert_eq!(cpu.registers.p.has::<'C'>(), true);
+  assert_eq!(cpu.registers.p.has::<'N'>(), true);
+  assert_eq!(cpu.registers.p.has::<'V'>(), false);
+  assert_eq!(cpu.registers.p.has::<'Z'>(), false);
+  cpu.step(&mut ram);
+  assert_eq!(cpu.registers.a, 0x40);
+  assert_eq!(cpu.registers.p.has::<'C'>(), false);
+  assert_eq!(cpu.registers.p.has::<'N'>(), false);
+  assert_eq!(cpu.registers.p.has::<'V'>(), false);
+  assert_eq!(cpu.registers.p.has::<'Z'>(), false);
+}
+  
