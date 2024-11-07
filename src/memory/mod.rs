@@ -26,6 +26,23 @@ pub trait MemoryBus {
   fn write(&mut self, address: Address, value: u8);
 }
 
+// Construct 16 bit Address from memory bytes in little endian order
+pub fn read_address(memory: &dyn MemoryBus, address: Address) -> Address {
+  let lo = memory.read(address);
+  let hi = memory.read(address.next());
+  Address::from_le_bytes(lo, hi)
+}
+
+pub fn slice(memory: &dyn MemoryBus, mut address: Address, mut size: usize) -> Vec<u8> {
+  let mut vec = Vec::new();
+  while size != 0 {
+    vec.push(memory.read(address));
+    address = address.next();
+    size -= 1;
+  }
+  vec
+}
+
 #[derive(Clone, Copy)]
 pub struct Address(u16);
 
