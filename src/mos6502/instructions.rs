@@ -280,7 +280,7 @@ fn test_adc_70_plus_70() {
 }
 
 #[test]
-fn test_adc_D0_plus_90() {
+fn test_adc_d0_plus_90() {
   let mut accumulator = 0xD0;
   let mut status = Status::new();
   assert!(!status.has::<'C'>());
@@ -293,7 +293,7 @@ fn test_adc_D0_plus_90() {
 }
 
 #[test]
-fn test_adc_D1_plus_D1() {
+fn test_adc_d1_plus_d1() {
   let mut accumulator = 0xD1;
   let mut status = Status::new();
   assert!(!status.has::<'C'>());
@@ -333,11 +333,6 @@ impl AccOp for Ora {
   }
 }
 
-// addr instr     disass        |AC XR YR SP|nvdizc|#
-// EB14 38        SEC           |C0 07 00 F9|000111|2
-// EB15 E9 40     SBC #$40      |80 07 00 F9|100101|2
-// EB17 4A        LSR A         |40 07 00 F9|000100|2
-
 struct Sbc;
 impl AccOp for Sbc {
   fn call(accumulator: &mut u8, status: &mut Status, value: u8) {
@@ -354,7 +349,7 @@ impl AccOp for Sbc {
 }
 
 #[test]
-fn test_sbc_50_minus_F0() {
+fn test_sbc_50_minus_f0() {
   let mut accumulator = 0x50;
   let mut status = Status::new();
   status.set_flag::<'Z', true>();
@@ -368,7 +363,7 @@ fn test_sbc_50_minus_F0() {
 }
 
 #[test]
-fn test_sbc_BF_minus_40() {
+fn test_sbc_bf_minus_40() {
   let mut accumulator = 0xBF;
   let mut status = Status::new();
   status.set_flag::<'C', true>();
@@ -381,7 +376,7 @@ fn test_sbc_BF_minus_40() {
 }
 
 #[test]
-fn test_sbc_D0_minus_70() {
+fn test_sbc_d0_minus_70() {
   //    D0 = 208 | -48
   //    70 = 112 | 112
   //    -------------- -
@@ -972,4 +967,55 @@ const INSTRUCTIONS: [Instruction; 256] = [
   Instruction::new(INC, AddressingMode::AbsoluteX, by_ref::<Increment, UseAbsoluteWith<'X'>>),
   UND, // 0xff
 ];
+
+#[test]
+fn step_by_step() {
+  use crate::mos6502::CPU;
+  use crate::memory::{Address, MemoryBus, ram::RAM};
+
+  let mut cpu = CPU::new();
+  let mut mem = RAM::new();
+  let addr = Address::from(0);
+ 
+  mem.write(addr, 0x69); // ADC #0xFF
+  mem.write(addr.next(), 0xFF);
+  mem.write(addr.next().next(), 0x65); // ADC &0x00 (=0x69)
+
+  assert_eq!(cpu.registers.a, 0);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(addr));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0xFF);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 4);
+
+  cpu.registers.pc = addr; // reset; add 0xFF + carry
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+
+  cpu.registers.pc = addr; // reset; add 0xFF without carry
+  cpu.registers.p.set::<'C'>(false);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x67); // 0x68 - 1
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+}
+
 
