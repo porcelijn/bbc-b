@@ -14,17 +14,33 @@ pub struct CPU {
   cycles: u64,
 }
 
+type Breakpoint = dyn Fn(&CPU, &dyn MemoryBus) -> bool;
+
+#[allow(unused)]
+pub fn stop_when<const OPCODE: u8>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
+  mem.read(cpu.registers.pc) == OPCODE
+}
+
+#[allow(unused)]
+pub fn stop_after<const CYCLES: u64>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
+  cpu.cycles >= CYCLES
+}
+
 impl CPU {
   pub fn new() -> Self {
     CPU { registers: Registers::new(), cycles: 0 }
   }
 
-  pub fn step(&mut self, memory: &mut dyn MemoryBus, ticks: u64) {
-    while self.cycles < ticks {
-      let opcode = memory.read(self.registers.pc);
-      let instruction = Instruction::lookup(opcode);
-      instruction.execute(&mut self.registers, memory);
-      self.cycles += 1;
+  pub fn step(&mut self, memory: &mut dyn MemoryBus) {
+    let opcode = memory.read(self.registers.pc);
+    let instruction = Instruction::lookup(opcode);
+    instruction.execute(&mut self.registers, memory);
+    self.cycles += 1;
+  }
+
+  pub fn run(&mut self, memory: &mut dyn MemoryBus, stop: &Breakpoint) {
+    while !stop(&self, memory) {
+      self.step(memory);
     }
   }
 }
