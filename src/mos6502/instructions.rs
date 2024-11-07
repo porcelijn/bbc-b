@@ -660,6 +660,10 @@ fn not_implemented<AM: UseMode>(registers: &mut Registers, memory: &mut dyn Memo
   unimplemented!("{operation:#04x} {mnemonic} {mode_name}");
 }
 
+fn no_operation<AM: UseMode>(registers: &mut Registers, _: &mut dyn MemoryBus) {
+//panic!("NOP instruction");
+  registers.pc.inc_by(AM::get_size());
+}
 fn handle_interrupt<const VECTOR: u16>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   stack_push(registers, memory, registers.pc.hi_u8());
   stack_push(registers, memory, registers.pc.lo_u8());
@@ -944,7 +948,7 @@ const INSTRUCTIONS: [Instruction; 256] = [
   UND, // 0xe7
   Instruction::new(INX, AddressingMode::Implied, inc_register::<'X', UseImplied>),
   Instruction::new(SBC, AddressingMode::Immediate, by_acc::<Sbc, UseImmediate>),
-  Instruction::new(NOP, AddressingMode::Implied, not_implemented::<UseImplied>),
+  Instruction::new(NOP, AddressingMode::Implied, no_operation::<UseImplied>),
   UND, // 0xeb
   Instruction::new(CPX, AddressingMode::Absolute, compare::<'X', UseAbsolute>),
   Instruction::new(SBC, AddressingMode::Absolute, by_acc::<Sbc, UseAbsolute>),
