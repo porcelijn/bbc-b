@@ -96,7 +96,7 @@ fn another_test() {
 }
 
 #[test]
-fn test_euclid() {
+fn euclidi_gcd() {
   // Euclid's algorithm for finding the Greatest Common Denominator
 
   const EUCLID: [u8; 34] = [
