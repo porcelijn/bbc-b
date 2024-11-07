@@ -1,6 +1,54 @@
 
 use bbc_b::mos6502::{CPU, stop_when};
-use bbc_b::memory::{Address, ram::RAM};
+use bbc_b::mos6502::instructions::Instruction;
+use bbc_b::memory::{Address, MemoryBus, ram::RAM, slice};
+
+#[test]
+fn step_by_step() {
+  let mut cpu = CPU::new();
+  let mut mem = RAM::new();
+  let addr = Address::from(0);
+ 
+  mem.write(addr, 0x69); // ADC #0xFF
+  mem.write(addr.next(), 0xFF);
+  mem.write(addr.next().next(), 0x65); // ADC &0x00 (=0x69)
+
+  assert_eq!(cpu.registers.a, 0);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(addr));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0xFF);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 4);
+
+  cpu.registers.pc = addr; // reset; add 0xFF + carry
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+
+  cpu.registers.pc = addr; // reset; add 0xFF without carry
+  cpu.registers.p.set::<'C'>(false);
+  assert_eq!(cpu.registers.a, 0x68);
+  assert!(!cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 0);
+  let inst = Instruction::lookup(mem.read(cpu.registers.pc));
+  inst.execute(&mut cpu.registers, &mut mem);
+  assert_eq!(cpu.registers.a, 0x67); // 0x68 - 1
+  assert!(cpu.registers.p.has::<'C'>());
+  assert_eq!(cpu.registers.pc.to_u16(), 2);
+}
 
 #[test]
 fn test_program() {
