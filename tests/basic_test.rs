@@ -1,6 +1,6 @@
 
 use bbc_b::mos6502::{CPU, stop_when};
-use bbc_b::memory::{Address, ram::RAM};
+use bbc_b::memory::{Address, MemoryBus, ram::RAM};
 
 #[test]
 fn test_program() {
@@ -94,4 +94,62 @@ fn another_test() {
   assert_eq!(cpu.registers.p.has::<'V'>(), false);
   assert_eq!(cpu.registers.p.has::<'Z'>(), false);
 }
+
+#[test]
+fn test_euclid() {
+  // Euclid's algorithm for finding the Greatest Common Denominator
+
+  const EUCLID: [u8; 34] = [
+/*
+                      // Initialize
+    0xa9, 0x23,       // STA #35 (decimal)
+    0x85, 0x00,       // STA &00
+    0xa9, 0x15,       // STA #21 (decimal)
+    0x85, 0x01,       // STA &00
+*/
+                      // :algo (&1008)
+    0xa5, 0x00,       // LDA &00
+                      // :algo_ (&100a)
+    0x38,             // SEC
+    0xe5, 0x01,       // SBC &01
+    0xf0, 0x07,       // BEQ pc + 7 (to :end)
+    0x30, 0x08,       // BMI pc + 8 (to :swap)
+    0x85, 0x00,       // STA &00
+    0x4c, 0x0a, 0x10, // JMP &100a
+                      // :end
+    0xa5, 0x00,       // LDA &00
+    0x00,             // BRK <--- STOP HERE
+                      // :swap
+    0xa6, 0x00,       // LDX &00
+    0xa4, 0x01,       // LDY &01
+    0x86, 0x01,       // STX &01
+    0x84, 0x00,       // STY &00
+    0x4c, 0x08, 0x10, // JMP &1008
+    0x4c, 0x1c, 0x10, // JMP &101c
+    0x4c, 0x1f, 0x10, // JMP &101f
+  ];
+
+  let start = Address::from(0x1008);
+  let mut ram = RAM::new();
+  ram.load_at(&EUCLID, start);
+
+  let mut compute_gcd = |a: u8, b: u8| -> u8 {
+    // GCD(&0x00, &0x01) inputs first two bytes in zero page
+    ram.write(Address::from(0x0000), a);
+    ram.write(Address::from(0x0001), b);
+    let mut cpu = CPU::new();
+    cpu.registers.pc = start;
+    // stop emulation at the BRK instruction at 0x1010
+    const BRK: u8 = 0x00;
+    cpu.run(&mut ram, &stop_when::<BRK>);
+    // result in accumulator
+    cpu.registers.a
+  };
   
+  assert_eq!(compute_gcd(35, 21), 7);
+  assert_eq!(compute_gcd(135, 90), 45);
+  assert_eq!(compute_gcd(255, 180), 15);
+  assert_eq!(compute_gcd(54, 180), 18);
+}
+
+ 
