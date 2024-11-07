@@ -1,7 +1,7 @@
 mod addressing_modes;
 mod alu;
 mod instructions;
-mod registers;
+pub mod registers;
 
 use registers::Registers;
 use instructions::Instruction;
@@ -11,7 +11,7 @@ use crate::memory::MemoryBus;
 #[derive(Debug)]
 pub struct CPU {
   pub registers: Registers,
-  cycles: u64,
+  pub cycles: u64,
 }
 
 type Breakpoint = dyn Fn(&CPU, &dyn MemoryBus) -> bool;
