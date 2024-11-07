@@ -2,8 +2,7 @@ mod mos6502;
 mod memory;
 
 use mos6502::CPU;
-use memory::{Address, MemoryBus};
-use memory::ram::{RAM, read_address, slice};
+use memory::{Address, MemoryBus, ram::RAM, read_address, slice};
 
 fn main() {
   println!("My first BBC-B emulator");
