@@ -1,8 +1,5 @@
-mod mos6502;
-mod memory;
-
-use mos6502::CPU;
-use memory::{Address, MemoryBus, ram::RAM, read_address, slice};
+use bbc_b::mos6502::{CPU, stop_after};
+use bbc_b::memory::{Address, MemoryBus, ram::RAM, read_address, slice};
 
 fn main() {
   println!("My first BBC-B emulator");
@@ -15,7 +12,7 @@ fn main() {
   assert_eq!(slice(&ram, irq_vector, 2), [0xAD, 0xDE]);
   assert_eq!(read_address(&ram, irq_vector).to_u16(), 0xDEAD);
   println!("- {:?}", cpu);
-  cpu.step(&mut ram, 3); // execute BRK at 0x0000, 0xDEAD, 0xDEAD
+  cpu.run(&mut ram, &stop_after::<3>); // execute BRK at 0x0000, 0xDEAD, 0xDEAD
   println!("- {:?}", cpu);
   assert_eq!(cpu.registers.pc, Address::from(0xDEAD));
   assert_eq!(cpu.registers.s.to_u8(), 0xFF - 3 * 3);
