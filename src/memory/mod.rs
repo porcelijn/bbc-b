@@ -57,7 +57,6 @@ impl Address {
     Address(hi << 8 | lo)
   }
 
-  #[allow(unused)]
   pub const fn to_u16(&self) -> u16 {
     self.0
   }
@@ -80,7 +79,6 @@ impl Address {
     self.0 = self.0.wrapping_add(plus.into());
   }
 
-  #[allow(unused)]
   pub fn dec_by(&mut self, plus: u8) {
     self.0 = self.0.wrapping_sub(plus.into());
   }
