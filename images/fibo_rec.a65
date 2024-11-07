@@ -1,0 +1,31 @@
+
+;  cl65 -o fibo_rec.bin --start-addr 0x0800 fibo_rec.a65 -t none
+
+.define TEMP $80
+
+INIT:
+ LDX #$8
+START:
+ TXA
+ BNE M01 ; f(0) = 0? no, continue
+ RTS ; yes
+M01:
+ DEX ; prepare for f(x-1) call
+ BNE M02 ; f(1) = 1? no, continue
+ RTS ; yes
+M02:
+ TXA ; save X on stack
+ PHA
+ JSR START ; result of f(x-1) in accumulator
+ TAY ; let’s put f(x-1) aside
+ PLA ; get X back from stack
+ TAX
+ TYA ; get f(x-1) back
+ PHA ; save that for now on stack
+ DEX ; prepare f(x-2)
+ JSR START
+ STA TEMP ; store f(x-2) for addition
+ PLA ; f(x-1) from stack
+ CLC
+ ADC TEMP ; f(x-1) + f(x-2)
+ RTS
