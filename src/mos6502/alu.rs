@@ -1,6 +1,4 @@
-use crate::memory::Address;
 use crate::mos6502::registers::Status;
-
 
 pub const fn add_with_carry(register: u8, value: u8, carry: bool)
           -> (u8, bool, bool) {
@@ -75,14 +73,6 @@ pub const fn ror(value: u8, in_carry: bool) -> (u8, bool) {
     result |= 0b1000_0000; // shift old carry into bit 7
   }
   (result, out_carry)
-}
-
-pub fn branch<const FLAG: char, const SET: bool>(pc: &mut Address, status: &Status, value: Address) {
-  let condition = status.has::<FLAG>();
-
-  if condition == SET {
-    *pc = value;
-  }
 }
 
 pub const fn subtract_with_carry(register: u8, value: u8, carry: bool)

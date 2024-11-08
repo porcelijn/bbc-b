@@ -258,11 +258,11 @@ impl AccOp for Adc {
       alu::add_with_carry(*accumulator, value, status.has::<'C'>());
     let negative = result & 0b0_1000_0000 != 0;
 
-    *accumulator = result;
     status.set::<'C'>(carry);
     status.set::<'N'>(negative);
     status.set::<'V'>(overflow);
     status.set::<'Z'>(result == 0);
+    *accumulator = result;
   }
 }
 
@@ -304,7 +304,6 @@ fn test_adc_d1_plus_d1() {
   assert!(!status.has::<'V'>());
   assert!(!status.has::<'Z'>());
 }
-
 
 struct And;
 impl AccOp for And {
@@ -548,8 +547,10 @@ fn return_interrupt<AM: UseMode>(registers: &mut Registers, memory: &mut dyn Mem
 fn branch<const FLAG: char, const SET: bool, AM: UseMode>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   let address = UseRelative::get_address(registers, memory);
   registers.pc.inc_by(AM::get_size());
-  let address = address.next();
-  alu::branch::<FLAG, SET>(&mut registers.pc, &registers.p, address);
+  let condition = registers.p.has::<FLAG>();
+  if condition == SET {
+    registers.pc = address.next();
+  }
 }
 
 fn set_flag<const FLAG: char, const SET: bool, AM: UseMode>(registers: &mut Registers, _: &mut dyn MemoryBus) {
@@ -664,7 +665,9 @@ fn no_operation<AM: UseMode>(registers: &mut Registers, _: &mut dyn MemoryBus) {
 //panic!("NOP instruction");
   registers.pc.inc_by(AM::get_size());
 }
-fn handle_interrupt<const VECTOR: u16>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
+
+pub fn handle_interrupt<const VECTOR: u16>(registers: &mut Registers,
+                                           memory: &mut dyn MemoryBus) {
   stack_push(registers, memory, registers.pc.hi_u8());
   stack_push(registers, memory, registers.pc.lo_u8());
   stack_push(registers, memory, registers.p.to_u8());
@@ -676,18 +679,6 @@ fn handle_brk(registers: &mut Registers, memory: &mut dyn MemoryBus) {
 //panic!("BRK instruction");
   registers.p.set_flag::<'B', true>();
   handle_interrupt::<0xFFFE>(registers, memory);
-}
-
-#[allow(unused)]
-pub fn handle_irq(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  registers.p.set_flag::<'B', false>();
-  handle_interrupt::<0xFFFE>(registers, memory);
-}
-
-#[allow(unused)]
-pub fn handle_nmi(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  registers.p.set_flag::<'B', false>();
-  handle_interrupt::<0xFFFA>(registers, memory);
 }
 
 pub struct Instruction {

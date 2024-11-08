@@ -1,0 +1,46 @@
+;
+; Shortly after CPU enters START, it will spin in a loop waiting for mem[0] to
+; become 0. This never happens unless the INTERRUPT routine is executed. The
+; spin loop either exits after 255 tries with accumulator = 0 (failure) or
+; after the semaphore is freed with accumulator = 1 (success).
+; Execution must stop when reaching BRK and this must be the fine BRK. So, on
+; exit, pc should point at end of program
+;
+;  cl65 -t none -o interrupt.bin interrupt.a65
+;
+
+.ORG $FF00
+
+START:
+  ldx #$FF
+  stx $00     ; initialize semafore
+  jsr loop
+  jmp end     ; we're done
+  brk
+  brk
+  brk
+loop:
+  dex
+  beq timeout ; stop, failed
+  lda $00     ; read semafore
+  bne loop    ; spin back
+  lda #1      ; OK
+  rts
+timeout:
+  lda #0      ; Failed
+  rts
+  brk
+  brk
+  brk
+INTERRUPT:
+  inc $00     ; 0xE6 0x00 release semafore
+  rti         ; 0x40
+  brk
+  brk
+  brk
+dummy:        ; don't use this jump
+  sei
+  jsr INTERRUPT
+end:
+  brk
+
