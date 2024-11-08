@@ -91,7 +91,8 @@ pub fn disassemble_with_address(address: Address, bytes: &[u8]) -> String {
       _        => addressing_mode.get_operand(bytes),
     }
   };
-  do_disassemble(bytes, get_operand)
+
+  format!("{address:?}  {}", do_disassemble(bytes, get_operand))
 }
 
 #[test]
