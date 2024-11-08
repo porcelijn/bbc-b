@@ -7,6 +7,7 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 * Branch, jump and subroutines
 * `BRK` and rudimentary IRQ and NMI handling
 * 6502 disassembler
+* preliminary benchmark performance ~7e7 instructions / second
 ## todo
 * Instruction execution puts PC increment in wrong place
 * Missing all peripherals
