@@ -2,8 +2,7 @@
 use bbc_b::mos6502::{CPU, stop_after, stop_when};
 use bbc_b::memory::{Address, MemoryBus, ram::RAM};
 
-#[test]
-fn test_interrupt() {
+fn load_program() -> (RAM, Address, Address, Address) {
   // Shortly after CPU enters START, it will spin in a loop waiting for mem[0]
   // to become 0. This never happens unless the INTERRUPT routine is executed.
   // The spin loop either exits after 255 tries with accumulator = 0 (failure)
@@ -51,64 +50,72 @@ fn test_interrupt() {
   ram.write(IRQ_VECTOR,        irq_entry.lo_u8());
   ram.write(IRQ_VECTOR.next(), irq_entry.hi_u8());
 
-  {
-    // Run without interruption
-    // - stopped at END label (pc = 0xFF27)
-    // - accumulator == 0 on exit -> failure
-    // - X == 0 -> watchdog depleted
-    let mut cpu = CPU::new();
-    cpu.registers.pc = start;
+  (ram, start, end, irq_entry)
+}
 
-    const BRK: u8 = 0x0;
-    cpu.run(&mut ram, &stop_when::<BRK>);
-    let regs = &mut cpu.registers;
-    assert_eq!(regs.pc, end);
-    assert_eq!(regs.a, 0); // FAIL
-    assert_eq!(regs.x, 0);
-    assert_eq!(regs.s.to_u8(), 0xFF); // Initial value
-    assert!(!regs.p.has::<'I'>());
-  }
+#[test]
+fn test_interrupt() {
+  let (mut ram, start, end, _) = load_program();
 
-  {
-    // Interrupt after 100 "cycles"
-    // - stopped at END label (pc = 0xFF27)
-    // - accumulator == 1 on exit -> success
-    // - X != 0 -> watchdog not depleted
-    let mut cpu = CPU::new();
-    cpu.registers.pc = start;
+  // Run without interruption
+  // - stopped at END label (pc = 0xFF27)
+  // - accumulator == 0 on exit -> failure
+  // - X == 0 -> watchdog depleted
+  let mut cpu = CPU::new();
+  cpu.registers.pc = start;
 
-    const BRK: u8 = 0x0;
-    cpu.run(&mut ram, &stop_after::<100>);
+  const BRK: u8 = 0x0;
+  cpu.run(&mut ram, &stop_when::<BRK>);
+  let regs = &mut cpu.registers;
+  assert_eq!(regs.pc, end);
+  assert_eq!(regs.a, 0); // FAIL
+  assert_eq!(regs.x, 0);
+  assert_eq!(regs.s.to_u8(), 0xFF); // Initial value
+  assert!(!regs.p.has::<'I'>());
+}
 
-    // stopped arbitrarily aftes 100 "cycles", we're somewhere in spin loop
-    assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
-    assert_eq!(cpu.registers.a, 0xFF);
+#[test]
+fn test_no_interrupt() {
+  let (mut ram, start, end, irq_entry) = load_program();
 
-//  println!("handle interrupt");
-    cpu.handle_irq(&mut ram);
-    // We're servicing the interrupt, going step-by-step
-    assert_eq!(cpu.registers.pc, irq_entry);
-    assert!(cpu.registers.p.has::<'I'>());
-    assert!(!cpu.registers.p.has::<'B'>());
+  // Interrupt after 100 "cycles"
+  // - stopped at END label (pc = 0xFF27)
+  // - accumulator == 1 on exit -> success
+  // - X != 0 -> watchdog not depleted
+  let mut cpu = CPU::new();
+  cpu.registers.pc = start;
 
-    cpu.step(&mut ram); // 1
-    assert_eq!(cpu.registers.pc, irq_entry.next().next()); // @ RTI, now
-    assert!(cpu.registers.p.has::<'I'>());
-    assert!(!cpu.registers.p.has::<'B'>());
-    cpu.step(&mut ram); // 2
+  const BRK: u8 = 0x0;
+  cpu.run(&mut ram, &stop_after::<100>);
 
-    assert_eq!(cpu.registers.pc, Address::from(0xFF0E)); // back spin loop 
-    assert!(!cpu.registers.p.has::<'I'>());
+  // stopped arbitrarily aftes 100 "cycles", we're somewhere in spin loop
+  assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
+  assert_eq!(cpu.registers.a, 0xFF);
 
-    // run till END
-    cpu.run(&mut ram, &stop_when::<BRK>);
+//println!("handle interrupt");
+  cpu.handle_irq(&mut ram);
+  // We're servicing the interrupt, going step-by-step
+  assert_eq!(cpu.registers.pc, irq_entry);
+  assert!(cpu.registers.p.has::<'I'>());
+  assert!(!cpu.registers.p.has::<'B'>());
 
-    assert_eq!(cpu.registers.pc, end);
-    assert_eq!(cpu.registers.a, 1); // SUCCESS
-    assert_eq!(cpu.registers.x, 230); // not depleted
-    assert_eq!(cpu.registers.s.to_u8(), 0xFF); // Initial value
-    assert!(!cpu.registers.p.has::<'I'>());
-  }
+  cpu.step(&mut ram); // 1
+  assert_eq!(cpu.registers.pc, irq_entry.next().next()); // @ RTI, now
+  assert!(cpu.registers.p.has::<'I'>());
+  assert!(!cpu.registers.p.has::<'B'>());
+  cpu.step(&mut ram); // 2
+
+  assert_eq!(cpu.registers.pc, Address::from(0xFF0E)); // back spin loop 
+  assert!(!cpu.registers.p.has::<'I'>());
+
+  // run till END
+  cpu.run(&mut ram, &stop_when::<BRK>);
+
+  assert_eq!(cpu.registers.pc, end);
+  assert_eq!(cpu.registers.a, 1); // SUCCESS
+  assert_eq!(cpu.registers.x, 230); // not depleted
+  assert_eq!(cpu.registers.s.to_u8(), 0xFF); // Initial value
+  assert!(!cpu.registers.p.has::<'I'>());
 }
 
  
