@@ -1,4 +1,5 @@
-use super::instructions::Instruction;
+use super::instructions::{Instruction, AddressingMode};
+use crate::memory::Address;
 
 // iterate over variable size &[u8] chunks, where each 1, 2 or 3 byte chunk is
 // a 6502 instruction 
@@ -51,7 +52,7 @@ fn hexdump(bytes: &[u8], size: usize) -> String {
   hexs.join(" ")
 }
 
-pub fn disassemble(bytes: &[u8]) -> String {
+fn do_disassemble(bytes: &[u8], get_operand: impl Fn(&AddressingMode, &[u8]) -> String) -> String {
   assert!(bytes.len() > 0);
   let operation = Instruction::lookup(bytes[0]);
   let operand_size = operation.addressing_mode.get_size() as usize;
@@ -62,7 +63,7 @@ pub fn disassemble(bytes: &[u8]) -> String {
     format!("{hexdump} {mnemonic} {addressing_mode}")
   } else if operand_size > 0 {
     let operand = &bytes[1 .. 1 + operand_size];
-    let addressing_mode = operation.addressing_mode.get_operand(operand);
+    let addressing_mode = get_operand(&operation.addressing_mode, operand);
     format!("{hexdump} {mnemonic} {addressing_mode}")
   } else {
     format!("{hexdump} {mnemonic}")
@@ -72,6 +73,36 @@ pub fn disassemble(bytes: &[u8]) -> String {
   } else {
     result
   }
+}
+
+pub fn disassemble(bytes: &[u8]) -> String {
+  let get_operand = |addressing_mode: &AddressingMode, bytes: &[u8]| -> String {
+    addressing_mode.get_operand(bytes)
+  };
+  do_disassemble(bytes, get_operand)
+}
+
+pub fn disassemble_with_address(address: Address, bytes: &[u8]) -> String {
+  let get_operand = |addressing_mode: &AddressingMode, bytes: &[u8]| -> String {
+    match addressing_mode {
+      AddressingMode::Relative => {
+        assert!(bytes.len() == 1); // operand is pc-relative offset (1 x i8)
+        let operand = bytes[0];
+        let mut address = address;
+        address.inc_by(2);
+        if operand & 0b1000_0000 == 0 {
+          address.inc_by(operand)
+        } else {
+          address.dec_by(!operand + 1)
+        }
+        format!("{address:?}")
+      },
+      _ => {
+        addressing_mode.get_operand(bytes)
+      }
+    }
+  };
+  do_disassemble(bytes, get_operand)
 }
 
 #[test]

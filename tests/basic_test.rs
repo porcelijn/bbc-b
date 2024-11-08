@@ -1,6 +1,7 @@
 
-use bbc_b::mos6502::{CPU, disassemble::{Chunks, disassemble}, stop_when};
 use bbc_b::memory::{Address, MemoryBus, ram::RAM};
+use bbc_b::mos6502::{CPU, stop_when};
+use bbc_b::mos6502::disassemble::{Chunks, disassemble, disassemble_with_address};
 
 const PROGRAM: [u8; 38] = [
         // Code start
@@ -105,11 +106,8 @@ fn another_test() {
   assert_eq!(cpu.registers.p.has::<'Z'>(), false);
 }
 
-#[test]
-fn euclidi_gcd() {
-  // Euclid's algorithm for finding the Greatest Common Denominator
-
-  const EUCLID: [u8; 34] = [
+// Euclid's algorithm for finding the Greatest Common Denominator
+const EUCLID: [u8; 34] = [
 /*
                       // Initialize
     0xa9, 0x23,       // STA #35 (decimal)
@@ -137,8 +135,10 @@ fn euclidi_gcd() {
     0x4c, 0x08, 0x10, // JMP &1008
     0x4c, 0x1c, 0x10, // JMP &101c
     0x4c, 0x1f, 0x10, // JMP &101f
-  ];
+];
 
+#[test]
+fn euclid_gcd() {
   let start = Address::from(0x1008);
   let mut ram = RAM::new();
   ram.load_at(&EUCLID, start);
@@ -162,4 +162,14 @@ fn euclidi_gcd() {
   assert_eq!(compute_gcd(54, 180), 18);
 }
 
- 
+#[test]
+fn display_branches() {
+  // Branch are relocatable, but JMP/JSR addresses only make sense relative to
+  // intended target address
+  let mut addr = Address::from(0x1008);
+  for bytes in Chunks::new(&EUCLID) {
+    println!("{addr:?} {}", disassemble_with_address(addr, bytes));
+    assert!(bytes.len() <= 3);
+    addr.inc_by(bytes.len() as u8);
+  }
+}
