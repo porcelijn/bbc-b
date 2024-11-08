@@ -4,7 +4,7 @@ mod instructions;
 pub mod registers;
 
 use registers::Registers;
-use instructions::Instruction;
+use instructions::{Instruction, handle_interrupt};
 
 use crate::memory::MemoryBus;
 
@@ -35,6 +35,21 @@ impl CPU {
     let opcode = memory.read(self.registers.pc);
     let instruction = Instruction::lookup(opcode);
     instruction.execute(&mut self.registers, memory);
+    self.cycles += 1;
+//  println!("{self:?}");
+  }
+
+  #[allow(unused)]
+  pub fn handle_irq(&mut self, memory: &mut dyn MemoryBus) {
+    self.registers.p.set_flag::<'B', false>();
+    handle_interrupt::<0xFFFE>(&mut self.registers, memory);
+    self.cycles += 1;
+  }
+
+  #[allow(unused)]
+  pub fn handle_nmi(&mut self, memory: &mut dyn MemoryBus) {
+    self.registers.p.set_flag::<'B', false>();
+    handle_interrupt::<0xFFFA>(&mut self.registers, memory);
     self.cycles += 1;
   }
 
