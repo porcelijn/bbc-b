@@ -1,5 +1,6 @@
 mod addressing_modes;
 mod alu;
+pub mod disassemble;
 mod instructions;
 pub mod registers;
 

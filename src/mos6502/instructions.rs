@@ -90,11 +90,11 @@ pub enum Mnemonic {
   TXA, // Transfer X to Accumulator
   TXS, // Transfer X to Stack pointer
   TYA, // Transfer Y to Accumulator
+  UND, // Undefined
 }
 
 impl Mnemonic {
-  const fn to_str(&self) -> &'static str
-  {
+  pub const fn to_str(&self) -> &'static str {
     match self {
       Self::ADC => "ADC",
       Self::AND => "AND",
@@ -160,6 +160,22 @@ impl Mnemonic {
       Self::TXA => "TXA",
       Self::TXS => "TXS",
       Self::TYA => "TYA",
+      Self::UND => "???",
+    }
+  }
+
+  fn is_valid(&self) -> bool {
+    match self {
+      Self::_BRA |
+      Self::_PHX |
+      Self::_PHY |
+      Self::_PLX |        // 65c02 instructions, not implemented
+      Self::_PLY |
+      Self::_STZ |
+      Self::_TRB |
+      Self::_TSB |
+      Self::UND => false, // explicitly: undefined!
+      _         => true,
     }
   }
 }
@@ -649,7 +665,7 @@ fn store<const REGISTER: char, AM: UseMode + UseAddress>(registers: &mut Registe
   registers.pc.inc_by(AM::get_size());
 }
 
-fn not_implemented<AM: UseMode>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
+fn undefined<AM: UseMode>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   // skip back one byte before operand
   let mut address = registers.pc;
   address.dec_by(1);
@@ -700,10 +716,16 @@ impl Instruction {
     registers.pc = registers.pc.next();
     (self.instr)(registers, memory);
   }
+
+  pub fn is_valid(&self) -> bool {
+    self.mnemonic.is_valid()
+  }
 }
 
 use Mnemonic::*;
-const UND: Instruction = Instruction::new(NOP, AddressingMode::Implied, not_implemented::<UseImplied>);
+const UND: Instruction = Instruction::new(Mnemonic::UND,
+                                          AddressingMode::Implied,
+                                          undefined::<UseImplied>);
 const INSTRUCTIONS: [Instruction; 256] = [
   Instruction::new(BRK, AddressingMode::Implied, handle_brk), //0x00
   Instruction::new(ORA, AddressingMode::IndexedIndirectX, by_acc::<Ora, UseIndexedIndirectX>),
@@ -930,7 +952,7 @@ const INSTRUCTIONS: [Instruction; 256] = [
   Instruction::new(DEC, AddressingMode::AbsoluteX, by_ref::<Decrement, UseAbsoluteWith<'X'>>),
   UND, // 0xdf
   Instruction::new(CPX, AddressingMode::Immediate, compare::<'X', UseImmediate>),
-  Instruction::new(SBC, AddressingMode::IndexedIndirectX, not_implemented::<UseIndexedIndirectX>),
+  Instruction::new(SBC, AddressingMode::IndexedIndirectX, by_acc::<Sbc, UseIndexedIndirectX>),
   UND, // 0xe2
   UND, // 0xe3
   Instruction::new(CPX, AddressingMode::ZeroPage, compare::<'X', UseZeroPage>),

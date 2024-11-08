@@ -1,10 +1,8 @@
 
-use bbc_b::mos6502::{CPU, stop_when};
+use bbc_b::mos6502::{CPU, disassemble::{Chunks, disassemble}, stop_when};
 use bbc_b::memory::{Address, MemoryBus, ram::RAM};
 
-#[test]
-fn test_program() {
-  const PROGRAM: [u8; 38] = [
+const PROGRAM: [u8; 38] = [
         // Code start
         0xA9, // LDA Immediate
         0x01, //     Immediate operand
@@ -44,8 +42,20 @@ fn test_program() {
         0xFB, //     pc - 5
         0xEA, // NOP :)
         0xFF, // Something invalid -- the end!
-    ];
+];
 
+#[test]
+fn display_program() {
+  let mut addr = Address::from(0);
+  for bytes in Chunks::new(&PROGRAM) {
+    println!("{addr:?} {}", disassemble(bytes));
+    assert!(bytes.len() <= 3);
+    addr.inc_by(bytes.len() as u8);
+  }
+}
+
+#[test]
+fn test_program() {
   let start = Address::from(0);
   let mut ram = RAM::new();
   let _size = ram.load_at(&PROGRAM, start);
