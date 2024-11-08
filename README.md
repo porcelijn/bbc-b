@@ -6,8 +6,9 @@ Pet project to learn about 6502 cpu, Rust and BBC micro computer
 * Stack, register tranfers, etc
 * Branch, jump and subroutines
 * `BRK` and rudimentary IRQ and NMI handling
+* 6502 disassembler
 ## todo
-* Instruction excution puts PC increment in wrong place
+* Instruction execution puts PC increment in wrong place
 * Missing all peripherals
 * No timing or cycle counting whatsoever
 * needs mos6522 for system VIA to build some kind of keyboard interface
