@@ -1,5 +1,6 @@
 use super::instructions::{Instruction, AddressingMode};
 use crate::memory::Address;
+use crate::mos6502::addressing_modes::UseRelative;
 
 // iterate over variable size &[u8] chunks, where each 1, 2 or 3 byte chunk is
 // a 6502 instruction 
@@ -84,22 +85,10 @@ pub fn disassemble(bytes: &[u8]) -> String {
 
 pub fn disassemble_with_address(address: Address, bytes: &[u8]) -> String {
   let get_operand = |addressing_mode: &AddressingMode, bytes: &[u8]| -> String {
+    use AddressingMode::*;
     match addressing_mode {
-      AddressingMode::Relative => {
-        assert!(bytes.len() == 1); // operand is pc-relative offset (1 x i8)
-        let operand = bytes[0];
-        let mut address = address;
-        address.inc_by(2);
-        if operand & 0b1000_0000 == 0 {
-          address.inc_by(operand)
-        } else {
-          address.dec_by(!operand + 1)
-        }
-        format!("{address:?}")
-      },
-      _ => {
-        addressing_mode.get_operand(bytes)
-      }
+      Relative => UseRelative::get_operand_with_address(address, bytes),
+      _        => addressing_mode.get_operand(bytes),
     }
   };
   do_disassemble(bytes, get_operand)

@@ -125,6 +125,22 @@ impl<const XY: char> UseMode for UseZeroPageWith<XY> {
 }
 
 pub struct UseRelative;
+impl UseRelative {
+  pub fn get_operand_with_address(address: Address, bytes: &[u8]) -> String {
+    // resolve offset to absolute address, relative to start of branch
+    // instruction
+    assert!(bytes.len() == 1); // operand is pc-relative offset (1 x i8)
+    let operand = bytes[0];
+    let mut address = address;
+    address.inc_by(2);
+    if operand & 0b1000_0000 == 0 {
+      address.inc_by(operand)
+    } else {
+      address.dec_by(!operand + 1)
+    }
+    format!("&{address:?}")
+  }
+}
 impl UseAddress for UseRelative {
   fn get_address(registers: &Registers, memory: &dyn MemoryBus) -> Address {
     let operand = memory.read(registers.pc);
