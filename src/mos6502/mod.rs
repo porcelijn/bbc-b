@@ -7,7 +7,7 @@ pub mod registers;
 use registers::Registers;
 use instructions::{Instruction, handle_interrupt};
 
-use crate::memory::MemoryBus;
+use crate::memory::{Address, MemoryBus, read_address};
 
 #[derive(Debug)]
 pub struct CPU {
@@ -28,6 +28,9 @@ pub fn stop_after<const CYCLES: u64>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
 }
 
 impl CPU {
+  const NMI_VECTOR:     u16 = 0xFFFA;
+  const RESET_VECTOR:   u16 = 0xFFFC;
+  const IRQ_BRK_VECTOR: u16 = 0xFFFE;
   pub fn new() -> Self {
     CPU { registers: Registers::new(), cycles: 0 }
   }
@@ -43,15 +46,26 @@ impl CPU {
   #[allow(unused)]
   pub fn handle_irq(&mut self, memory: &mut dyn MemoryBus) {
     self.registers.p.set_flag::<'B', false>();
-    handle_interrupt::<0xFFFE>(&mut self.registers, memory);
+    handle_interrupt::<{Self::IRQ_BRK_VECTOR}>(&mut self.registers, memory);
     self.cycles += 1;
   }
 
   #[allow(unused)]
   pub fn handle_nmi(&mut self, memory: &mut dyn MemoryBus) {
     self.registers.p.set_flag::<'B', false>();
-    handle_interrupt::<0xFFFA>(&mut self.registers, memory);
+    handle_interrupt::<{Self::NMI_VECTOR}>(&mut self.registers, memory);
     self.cycles += 1;
+  }
+
+  #[allow(unused)]
+  pub fn reset(&mut self, memory: &mut dyn MemoryBus) {
+    // https://www.pagetable.com/?p=410
+    self.registers.a = 0xAA;
+    *self.registers.s.borrow_mut() = 0xFD;           // cycles 0-5
+    let address = Address::from(Self::RESET_VECTOR);
+    let address = read_address(memory, address);     // cycles 6, 7
+    self.registers.pc = address;                     // cycles 8, 9?
+    self.cycles += 9;
   }
 
   pub fn run(&mut self, memory: &mut dyn MemoryBus, stop: &Breakpoint) {

@@ -168,7 +168,7 @@ fn display_branches() {
   // intended target address
   let mut addr = Address::from(0x1008);
   for bytes in Chunks::new(&EUCLID) {
-    println!("{addr:?} {}", disassemble_with_address(addr, bytes));
+    println!("{}", disassemble_with_address(addr, bytes));
     assert!(bytes.len() <= 3);
     addr.inc_by(bytes.len() as u8);
   }

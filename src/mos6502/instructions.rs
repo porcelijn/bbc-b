@@ -674,7 +674,7 @@ fn undefined<AM: UseMode>(registers: &mut Registers, memory: &mut dyn MemoryBus)
   let instruction = Instruction::lookup(operation);
   let mnemonic = &instruction.mnemonic;
   let mode_name = instruction.addressing_mode.get_name();
-  unimplemented!("{operation:#04x} {mnemonic} {mode_name}");
+  unimplemented!("{operation:#04x} {mnemonic} {mode_name} at: {address:?}");
 }
 
 fn no_operation<AM: UseMode>(registers: &mut Registers, _: &mut dyn MemoryBus) {
