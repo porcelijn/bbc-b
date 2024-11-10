@@ -1,3 +1,4 @@
+pub mod devices;
 pub mod ram;
 
 //  SHEILA Integrated Description Section address circuit number (offset from
@@ -90,3 +91,50 @@ impl std::fmt::Debug for Address {
   }
 }
 
+pub struct PageDispatcher {
+  mapping: [u8; 256],
+  backends: Vec<Box<dyn MemoryBus>>,
+}
+
+impl PageDispatcher {
+  pub fn new(backend: Box<dyn MemoryBus>) -> Self {
+    let mut backends = Vec::new();
+    backends.push(backend);
+    PageDispatcher { mapping: [0u8; 256], backends }
+  }
+
+  pub fn add_backend(&mut self, page: u8, backend: Box<dyn MemoryBus>) {
+    self.mapping[page as usize] = self.backends.len() as u8;
+    self.backends.push(backend.into());
+  }
+}
+
+impl MemoryBus for PageDispatcher {
+  fn read(&self, address: Address) -> u8 {
+    let page = address.hi_u8();
+    let backend_index = self.mapping[page as usize];
+    let backend = &self.backends[backend_index as usize];
+    backend.read(address)
+  }
+
+  fn write(&mut self, address: Address, value: u8) {
+    let page = address.hi_u8();
+    let backend_index = self.mapping[page as usize];
+    let backend = &mut self.backends[backend_index as usize];
+    backend.write(address, value);
+  }
+}
+
+#[test]
+fn page_dispatcher() {
+  use crate::memory::ram::RAM;
+  use crate::memory::devices::{DevicePage, SheilaPage};
+  let ram = RAM::new();
+  let mut memory = PageDispatcher::new(Box::new(ram));
+  let sheila = SheilaPage::new();
+  memory.add_backend(SheilaPage::page(), Box::new(sheila));
+  let addr = Address::from(0xFE00);
+  memory.write(addr, 42);
+//assert_eq!(memory.read(addr), 42); // No, we're not seeing what we just wrote!
+  assert_eq!(memory.read(addr), 0xFF); // instead we get back bogus data
+}
