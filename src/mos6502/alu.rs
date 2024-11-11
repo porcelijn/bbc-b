@@ -17,6 +17,44 @@ pub const fn add_with_carry(register: u8, value: u8, carry: bool)
   (result, carry, overflow)
 }
 
+pub const fn add_decimal_with_carry(register: u8, value: u8, carry: bool)
+          -> (u8, bool, bool) {
+  const fn lo(value: u8) -> u8 { (value & 0b0000_1111) >> 0 }
+  const fn hi(value: u8) -> u8 { (value & 0b1111_0000) >> 4 }
+  const fn add_bcd_nibble(lhs: u8, rhs: u8, carry: u8) -> u8 {
+    let result = lhs + rhs + carry;
+    if result >= 0xA {
+      0x10 + lo(result + 6)
+    } else {
+      result
+    }
+  }
+
+  let carry          = carry as u8;
+  let lo_nibble      = add_bcd_nibble(lo(register), lo(value), carry);
+  let hi_nibble      = add_bcd_nibble(hi(register), hi(value), hi(lo_nibble));
+  let carry: bool    = hi(hi_nibble) != 0;
+  let result: u8     = lo(hi_nibble) << 4 | lo(lo_nibble);
+  let overflow: bool = (result ^ register)
+                     & (result ^ value)
+                     & 0b1000_0000 != 0;
+
+  (result, carry, overflow)
+}
+
+#[test]
+fn adc_decimal() {
+  assert_eq!((0x19, false, false), add_decimal_with_carry(0x09, 0x09, true));
+  assert_eq!((0x00, true, false), add_decimal_with_carry(0x98, 0x01, true));
+  assert_eq!((0x80, false, true), add_decimal_with_carry(0x79, 0x00, true));
+  assert_eq!((0x80, false, true), add_decimal_with_carry(0x24, 0x56, false));
+  assert_eq!((0x75, true, true), add_decimal_with_carry(0x82, 0x93, false));
+  // out of bound / invalid input: C, but no V (both 80, f0 and d0 are negative)
+  assert_eq!((0xd0, true, false), add_decimal_with_carry(0x80, 0xf0, false));
+  // overflow first nibble carries 1, not 2, into high byte
+  assert_eq!((0x15, false, false), add_decimal_with_carry(0x0f, 0x0f, true));
+}
+
 pub const fn and(accumulator: u8, value: u8) -> u8 {
   accumulator & value
 }

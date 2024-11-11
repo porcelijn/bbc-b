@@ -270,8 +270,13 @@ trait AccOp {
 struct Adc;
 impl AccOp for Adc {
   fn call(accumulator: &mut u8, status: &mut Status, value: u8) {
-    let (result, carry, overflow) =
-      alu::add_with_carry(*accumulator, value, status.has::<'C'>());
+    assert!(!status.has::<'D'>()); // not implemented
+    let (result, carry, overflow) = if !status.has::<'D'>() {
+      alu::add_with_carry(*accumulator, value, status.has::<'C'>())
+    } else {
+      alu::add_decimal_with_carry(*accumulator, value, status.has::<'C'>())
+    };
+
     let negative = result & 0b0_1000_0000 != 0;
 
     status.set::<'C'>(carry);
@@ -351,6 +356,7 @@ impl AccOp for Ora {
 struct Sbc;
 impl AccOp for Sbc {
   fn call(accumulator: &mut u8, status: &mut Status, value: u8) {
+    assert!(!status.has::<'D'>()); // not implemented
     let (result, carry, overflow) =
       alu::subtract_with_carry(*accumulator, value, status.has::<'C'>());
     let negative = result & 0b0_1000_0000 != 0;
