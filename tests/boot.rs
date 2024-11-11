@@ -1,7 +1,17 @@
 
+use std::path::Path;
+use std::io::prelude::*;
+use std::fs::File;
+
 use bbc_b::mos6502::{CPU, stop_after};
 use bbc_b::mos6502::disassemble::disassemble_with_address;
 use bbc_b::memory::{Address, ram::RAM, slice};
+
+fn dump(filename: &str, bytes: &[u8]) {
+  let path = Path::new(filename);
+  let mut file = File::create(&path).expect("could not create file");
+  file.write_all(bytes).expect("could not write file");
+}
 
 #[test]
 fn os120_reset() {
@@ -28,5 +38,7 @@ fn os120_reset() {
     assert_eq!(r.pc.to_u16(), 0xD9DE);
   }
 
-  cpu.run(&mut ram, &stop_after::<100_000>);
+  cpu.run(&mut ram, &stop_after::<10000_000>);
+  // capture (max) screen area (20kB)
+  dump("dump.bin", &slice(&ram, Address::from(0x3000), 0x5000));
 }
