@@ -357,8 +357,11 @@ struct Sbc;
 impl AccOp for Sbc {
   fn call(accumulator: &mut u8, status: &mut Status, value: u8) {
     assert!(!status.has::<'D'>()); // not implemented
-    let (result, carry, overflow) =
-      alu::subtract_with_carry(*accumulator, value, status.has::<'C'>());
+    let (result, carry, overflow) = if !status.has::<'D'>() {
+      alu::sub_with_carry(*accumulator, value, status.has::<'C'>())
+    } else {
+      alu::sub_decimal_with_carry(*accumulator, value, status.has::<'C'>())
+    };
     let negative = result & 0b0_1000_0000 != 0;
 
     *accumulator = result;
@@ -487,7 +490,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registe
   const CARRY: bool = true;
 
   let (result, carry, overflow) =
-    alu::subtract_with_carry(lhs, rhs, CARRY);
+    alu::sub_with_carry(lhs, rhs, CARRY);
   let negative = result & 0b0_1000_0000 != 0;
 
   registers.p.set::<'C'>(carry);

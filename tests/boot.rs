@@ -38,7 +38,7 @@ fn os120_reset() {
     assert_eq!(r.pc.to_u16(), 0xD9DE);
   }
 
-  cpu.run(&mut ram, &stop_after::<10000_000>);
+  cpu.run(&mut ram, &stop_after::<10_000_000>);
   // capture (max) screen area (20kB)
   dump("dump.bin", &slice(&ram, Address::from(0x3000), 0x5000));
 }
