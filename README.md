@@ -33,4 +33,28 @@ Emulating Mode 0, 3, or 4 monochrome graphics, this looks like `TT`:
 
 ![Screenshot-2024-11-09](https://github.com/user-attachments/assets/7159f916-6cf3-4d72-bda9-4e6889c4789a)
 
-Hmmm.
+---
+Progress: after clearing the SHEILA page (all zeroes; RAM rather than mapped
+devices), I'm seeing:
+
+```
+%  hd dump.bin 
+00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+00007c00  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+*
+00007c20  20 20 20 20 20 20 20 20  42 42 43 20 43 6f 6d 70  |        BBC Comp|
+00007c30  75 74 65 72 20 33 32 4b  20 20 20 20 20 20 20 20  |uter 32K        |
+00007c40  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+*
+00007c70  20 20 20 20 20 20 20 20  f9 4c 61 6e 67 75 61 67  |        .Languag|
+00007c80  65 3f 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |e?              |
+00007c90  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+*
+00008000
+```
+
+So it looks like we've landed in MODE 7, where the initialization loop detected
+correct amount of memory, tried to set up devices and interrupt vectors but
+fails to find the BASIC rom at 0x8000-0xC000. Which is fair, because it's not
+loaded, yet.
