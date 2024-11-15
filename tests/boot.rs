@@ -46,7 +46,7 @@ fn os120_reset() {
 
 
 #[test]
-fn os120_clear_sheila() {
+fn os120_reset_with_sheila() {
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
   let mut mem = PageDispatcher::new(Box::new(ram));

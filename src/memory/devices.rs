@@ -27,6 +27,55 @@ impl<D: BogusDevice> MemoryBus for D {
   }
 }
 
+struct VIA {}
+
+impl MemoryBus for VIA {
+  fn read(&self, address: Address) -> u8 {
+    match address.to_u16() & 0x000F {
+      0b0000 => println!("read {address:?} IORB"),
+      0b0001 => println!("read {address:?} IORa"),
+      0b0010 => println!("read {address:?} DDRB"),
+      0b0011 => println!("read {address:?} DDRA"),
+      0b0100 => println!("read {address:?} T1C-L"),
+      0b0101 => println!("read {address:?} T1C-H"),
+      0b0110 => println!("read {address:?} T1L-L"),
+      0b0111 => println!("read {address:?} T1L-H"),
+      0b1000 => println!("read {address:?} T2C-L"),
+      0b1001 => println!("read {address:?} T2C-H"),
+      0b1010 => println!("read {address:?} SR"),
+      0b1011 => println!("read {address:?} ACR"),
+      0b1100 => println!("read {address:?} PCR"),
+      0b1101 => println!("read {address:?} IFR"),
+      0b1110 => println!("read {address:?} IER"),
+      0b1111 => println!("read {address:?} IORAnh"),
+      _      => unreachable!(),
+    };
+
+    0xFF // bogus
+  }
+  fn write(&mut self, address: Address, value: u8) {
+    match address.to_u16() & 0x000F {
+      0b0000 => println!("write {value:#04x} -> {address:?} IORB"),
+      0b0001 => println!("write {value:#04x} -> {address:?} IORa"),
+      0b0010 => println!("write {value:#04x} -> {address:?} DDRB"),
+      0b0011 => println!("write {value:#04x} -> {address:?} DDRA"),
+      0b0100 => println!("write {value:#04x} -> {address:?} T1C-L"),
+      0b0101 => println!("write {value:#04x} -> {address:?} T1C-H"),
+      0b0110 => println!("write {value:#04x} -> {address:?} T1L-L"),
+      0b0111 => println!("write {value:#04x} -> {address:?} T1L-H"),
+      0b1000 => println!("write {value:#04x} -> {address:?} T2C-L"),
+      0b1001 => println!("write {value:#04x} -> {address:?} T2C-H"),
+      0b1010 => println!("write {value:#04x} -> {address:?} SR"),
+      0b1011 => println!("write {value:#04x} -> {address:?} ACR"),
+      0b1100 => println!("write {value:#04x} -> {address:?} PCR"),
+      0b1101 => println!("write {value:#04x} -> {address:?} IFR"),
+      0b1110 => println!("write {value:#04x} -> {address:?} IER"),
+      0b1111 => println!("write {value:#04x} -> {address:?} IORAnh"),
+      _      => unreachable!(),
+    };
+  }
+}
+
 //  &00–&07 6845 CRTC Video controller 18
 struct CRTC {}
 impl BogusDevice for CRTC {}
@@ -46,8 +95,9 @@ impl Device for ACIA {
 //  &30–&3F 74LS161 Paged ROM selector 21
 
 //  &40–&5F 6522 VIA SYSTEM VIA 23
-struct SystemVIA {}
-impl BogusDevice for SystemVIA {}
+//struct SystemVIA {}
+//impl VIA for SystemVIA {}
+type SystemVIA = VIA;
 impl Device for SystemVIA {
   fn name(&self) -> &'static str { "6522 System VIA" }
 }
@@ -116,7 +166,7 @@ impl MemoryBus for SheilaPage {
     let page = Self::page();
     let device = self.get_device(address);
     let name = device.borrow().name();
-    println!("{address:?} -> {value:02x} | Writing to SHEILA ({page}, {name})");
+    println!("{value:02x} -> {address:?} | Writing to SHEILA ({page}, {name})");
     device.borrow_mut().write(address, value);
   }
 }
