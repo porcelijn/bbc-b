@@ -1,43 +1,70 @@
-use std::marker::PhantomData;
-
 use crate::memory::{Address, devices::Device, MemoryBus};
 
-pub struct SystemPorts;
+pub trait Port {
+  fn read(&self, ddr_mask: u8) -> u8;
+  fn write(&mut self, value: u8, ddr_mask: u8);
+}
 
-//  &40–&5F 6522 VIA SYSTEM VIA 23
-pub type SystemVIA = VIA<SystemPorts>;
-impl SystemVIA {
-  pub const fn new() -> Self {
-    SystemVIA { _ports: PhantomData::<SystemPorts> }
+pub struct BogusPort<const ID: char, const VALUE: u8>;
+impl<const ID: char, const VALUE: u8> Port for BogusPort<ID, VALUE> {
+  fn read(&self, ddr_mask: u8) -> u8 {
+    let result = VALUE & ddr_mask; // fixme
+    println!("reading from port {ID} -> {result}");
+    result
+  }
+  fn write(&mut self, value: u8, ddr_mask: u8) {
+    let result = value & ddr_mask ^ VALUE; // fixme
+    println!("writing to port {ID} -> {result}");
   }
 }
+
+pub type SystemPortA = BogusPort<'A', 42>;
+
+//  &40–&5F 6522 VIA SYSTEM VIA 23
+pub type SystemVIA = VIA<SystemPortA>;
 impl Device for SystemVIA {
   fn name(&self) -> &'static str { "6522 System VIA" }
 }
 
-pub struct UserPorts;
+pub type UserPortA = BogusPort<'a', 0xFF>;
 
 //  &60–&7F 6522 VIA USER VIA 24
-pub type UserVIA = VIA<UserPorts>;
-impl UserVIA {
-  pub const fn new() -> Self {
-    UserVIA { _ports: PhantomData::<UserPorts> }
-  }
-}
+pub type UserVIA = VIA<UserPortA>;
 impl Device for UserVIA {
   fn name(&self) -> &'static str { "6522 User VIA" }
 }
 
 #[derive(Debug)]
-pub struct VIA<P> {
-  _ports: PhantomData<P>,
+pub struct VIA<P: Port> {
+  iora: u8,
+  iorb: u8,
+  ddra: u8,
+  ddrb: u8,
+  // todo ...
+  ier: u8,
+  port_a: P,
 }
 
-impl<P> MemoryBus for VIA<P> {
+const BIT7: u8 = 1u8 << 7;
+
+impl<P: Port> VIA<P> {
+  pub const fn new(port_a: P) -> Self {
+    VIA::<P>{ iora: 0, iorb: 0,
+            ddra: 0, ddrb: 0,
+            ier: 0,
+            port_a
+    }
+  }
+}
+
+impl<P: Port> MemoryBus for VIA<P> {
   fn read(&self, address: Address) -> u8 {
     match address.to_u16() & 0x000F {
       0b0000 => println!("read {address:?} IORB"),
-      0b0001 => println!("read {address:?} IORa"),
+      0b0001 => {
+        println!("read {address:?} IORA");
+        // self.iora = self.port_a.read(self.ddra);
+      },
       0b0010 => println!("read {address:?} DDRB"),
       0b0011 => println!("read {address:?} DDRA"),
       0b0100 => println!("read {address:?} T1C-L"),
@@ -50,8 +77,14 @@ impl<P> MemoryBus for VIA<P> {
       0b1011 => println!("read {address:?} ACR"),
       0b1100 => println!("read {address:?} PCR"),
       0b1101 => println!("read {address:?} IFR"),
-      0b1110 => println!("read {address:?} IER"),
-      0b1111 => println!("read {address:?} IORAnh"),
+      0b1110 => { 
+        println!("read {address:?} IER");
+        return self.ier | BIT7; // When read, bit 7 is *always* a logic 1
+      },
+      0b1111 => {
+        println!("read {address:?} IORAnh");
+        self.port_a.read(self.ddra);
+      },
       _      => unreachable!(),
     };
 
@@ -59,10 +92,27 @@ impl<P> MemoryBus for VIA<P> {
   }
   fn write(&mut self, address: Address, value: u8) {
     match address.to_u16() & 0x000F {
-      0b0000 => println!("write {value:#04x} -> {address:?} IORB"),
-      0b0001 => println!("write {value:#04x} -> {address:?} IORa"),
-      0b0010 => println!("write {value:#04x} -> {address:?} DDRB"),
-      0b0011 => println!("write {value:#04x} -> {address:?} DDRA"),
+      0b0000 => {
+        println!("write {value:#04x} -> {address:?} IORB");
+        self.iorb = value;
+        return;
+      },
+      0b0001 => {
+        println!("write {value:#04x} -> {address:?} IORA");
+        self.iora = value;
+        self.port_a.write(value, self.ddra);
+        return;
+      },
+      0b0010 => {
+        println!("write {value:#04x} -> {address:?} DDRB");
+        self.ddrb = value; //todo
+        return;
+      },
+      0b0011 => {
+        println!("write {value:#04x} -> {address:?} DDRA");
+        self.ddra = value; // todo
+        return;
+      },
       0b0100 => println!("write {value:#04x} -> {address:?} T1C-L"),
       0b0101 => println!("write {value:#04x} -> {address:?} T1C-H"),
       0b0110 => println!("write {value:#04x} -> {address:?} T1L-L"),
@@ -74,7 +124,10 @@ impl<P> MemoryBus for VIA<P> {
       0b1100 => println!("write {value:#04x} -> {address:?} PCR"),
       0b1101 => println!("write {value:#04x} -> {address:?} IFR"),
       0b1110 => println!("write {value:#04x} -> {address:?} IER"),
-      0b1111 => println!("write {value:#04x} -> {address:?} IORAnh"),
+      0b1111 => {
+        println!("write {value:#04x} -> {address:?} IORAnh");
+        self.port_a.write(value, self.ddra);
+      },
       _      => unreachable!(),
     };
   }

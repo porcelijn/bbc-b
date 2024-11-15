@@ -64,12 +64,12 @@ fn os120_reset_with_sheila() {
   }
   {
     let r = &cpu.registers;
-    assert_eq!(r.a, 0xFF << 1);
+    assert_eq!(r.a, 0);
     assert_eq!(r.x, 255);
     assert_eq!(r.y, 0);
-    assert_eq!(r.p.to_u8(), 0b1010_0101);
+    assert_eq!(r.p.to_u8(), 0b0010_0111);
     assert_eq!(r.s.to_u8(), 254);
-    assert_eq!(r.pc.to_u16(), 0xD9DE);
+    assert_eq!(r.pc.to_u16(), 0xD9E7);
   }
 
   cpu.run(&mut mem, &stop_after::<10_000_000>);
