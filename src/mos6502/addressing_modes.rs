@@ -138,7 +138,7 @@ impl UseRelative {
     } else {
       address.dec_by(!operand + 1)
     }
-    format!("&{address:?}")
+    format!("{address:?}")
   }
 }
 impl UseAddress for UseRelative {

@@ -5,7 +5,8 @@ use std::fs::File;
 
 use bbc_b::mos6502::{CPU, stop_after};
 use bbc_b::mos6502::disassemble::disassemble_with_address;
-use bbc_b::memory::{Address, ram::RAM, slice};
+use bbc_b::memory::{Address, PageDispatcher, ram::RAM, slice};
+use bbc_b::memory::devices::{DevicePage, SheilaPage};
 
 fn dump(filename: &str, bytes: &[u8]) {
   let path = Path::new(filename);
@@ -48,28 +49,30 @@ fn os120_reset() {
 fn os120_clear_sheila() {
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
-  ram.load_at(&[0; 256], Address::from(0xFE00)); // clear SHEILA page
+  let mut mem = PageDispatcher::new(Box::new(ram));
+  let sheila = SheilaPage::new();
+  mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   let mut cpu = CPU::new();
-  cpu.reset(&mut ram);
+  cpu.reset(&mut mem);
   assert_eq!(cpu.registers.pc, Address::from(0xD9CD)); // .resetEntryPoint
   for _ in 0..10 {
-    let slice = slice(&mut ram, cpu.registers.pc, 3);
+    let slice = slice(&mut mem, cpu.registers.pc, 3);
     let dump = disassemble_with_address(cpu.registers.pc, &slice);
     println!("{dump}");
-    cpu.step(&mut ram);
+    cpu.step(&mut mem);
   }
   {
     let r = &cpu.registers;
-    assert_eq!(r.a, 0);
+    assert_eq!(r.a, 0xFF << 1);
     assert_eq!(r.x, 255);
     assert_eq!(r.y, 0);
-    assert_eq!(r.p.to_u8(), 0b0010_0110);
+    assert_eq!(r.p.to_u8(), 0b1010_0101);
     assert_eq!(r.s.to_u8(), 254);
-    assert_eq!(r.pc.to_u16(), 0xD9E7); // reset memory
+    assert_eq!(r.pc.to_u16(), 0xD9DE);
   }
 
-  cpu.run(&mut ram, &stop_after::<10_000_000>);
+  cpu.run(&mut mem, &stop_after::<10_000_000>);
   // capture (max) screen area (20kB)
-  dump("dump.bin", &slice(&ram, Address::from(0x3000), 0x5000));
+  dump("dump.bin", &slice(&mem, Address::from(0x3000), 0x5000));
 }
