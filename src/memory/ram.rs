@@ -30,11 +30,11 @@ impl RAM {
       if file.read(&mut buf).expect("failed to read from file") == 0 {
         break;
       }
+      if addr.to_u16() == 0 {
+        panic!("reached end of memory!");
+      }
       self.write(addr, buf[0]);
       addr = addr.next();
-      if addr.to_u16() == 0 {
-        println!("reached end of memory!");
-      }
     }
 
     let addr = match addr.to_u16() {

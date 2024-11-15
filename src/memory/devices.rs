@@ -105,7 +105,7 @@ impl MemoryBus for SheilaPage {
     let device = self.get_device(address);
     let name = device.borrow().name();
     let value = device.borrow().read(address);
-    println!("{address:?} -> {value:02x} | Reading from SHEILA ({page}, {name})");
+    log::trace!("{address:?} -> {value:02x} | Reading from SHEILA ({page}, {name})");
     value
   }
 
@@ -113,9 +113,8 @@ impl MemoryBus for SheilaPage {
     let page = Self::page();
     let device = self.get_device(address);
     let name = device.borrow().name();
-    println!("{value:02x} -> {address:?} | Writing to SHEILA ({page}, {name})");
+    log::trace!("{value:02x} -> {address:?} | Writing to SHEILA ({page}, {name})");
     device.borrow_mut().write(address, value);
   }
 }
-
 

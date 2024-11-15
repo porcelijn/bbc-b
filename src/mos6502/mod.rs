@@ -40,7 +40,7 @@ impl CPU {
     let instruction = Instruction::lookup(opcode);
     instruction.execute(&mut self.registers, memory);
     self.cycles += 1;
-//  println!("{self:?}");
+//  log::trace!("{self:?}");
   }
 
   #[allow(unused)]

@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4"
+
+[dev-dependencies]
+#simple_logger = "5.0.0"
