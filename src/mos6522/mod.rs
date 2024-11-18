@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::memory::{Address, devices::Device, MemoryBus};
 
 pub trait Port {
@@ -44,17 +46,18 @@ pub struct VIA<P: Port> {
   ddrb: u8,
   // todo ...
   acr: u8,
-  ier: u8,
+  ier: u8, ifr: Cell<u8>,
   port_a: P,
 }
 
 const BIT7: u8 = 1u8 << 7;
+const NBIT7: u8 = ! BIT7;
 
 impl<P: Port> VIA<P> {
   pub const fn new(port_a: P) -> Self {
     VIA::<P>{ iora: 0, iorb: 0,
               ddra: 0, ddrb: 0,
-              acr: 0, ier: 0,
+              acr: 0, ier: 0, ifr: Cell::new(0),
               port_a
     }
   }
@@ -62,12 +65,54 @@ impl<P: Port> VIA<P> {
   const fn mask_bits(register: u8, value: u8, mask: u8) -> u8 {
     (register & !mask) | (value & mask)
   }
+
+  fn clear_ifr_bits(&self, bits: u8) {
+    assert!(bits & BIT7 == 0);
+    let mut ifr = self.ifr.get();
+    ifr &= !bits;
+    self.ifr.set(ifr);
+    self.update_ifr_irq();
+  }
+
+  #[allow(unused)]
+  fn set_ifr_bits(&self, bits: u8) {
+    assert!(bits & BIT7 == 0);
+    let mut ifr = self.ifr.get();
+    ifr |= bits;
+    self.ifr.set(ifr);
+    self.update_ifr_irq();
+  }
+
+  fn update_ifr_irq(&self) {
+    let ier_mask = self.ier & NBIT7;
+    let mut ifr = self.ifr.get();
+    let ifr_mask = ifr & NBIT7;
+    if ier_mask & ifr_mask != 0 {
+      ifr |= BIT7;
+    } else {
+      ifr &= NBIT7;
+    }
+    self.ifr.set(ifr);
+  }
 }
 
 impl<P: Port> MemoryBus for VIA<P> {
   fn read(&self, address: Address) -> u8 {
     match address.to_u16() & 0x000F {
-      0b0000 => log::trace!("read {address:?} IORB"),
+      0b0000 => {
+        // system via uses top four bits for reading, bottom four for writing
+        // TODO: clear interrupt
+        let mut result = self.iorb & self.ddrb; // read output bits
+        if self.acr & 0b0000_0010 != 0 {
+          // read latch
+          result |= self.iorb & !self.ddrb;
+        } else {
+          // read current port values
+          //result |= self.port_b.read() & !self.ddrb;
+        }
+        log::trace!("read {address:?} IORB -> {result}");
+        return result;
+      },
       0b0001 => {
         // self.iora = self.port_a.read(self.ddra);
         let result = self.iora;
@@ -76,7 +121,13 @@ impl<P: Port> MemoryBus for VIA<P> {
       },
       0b0010 => log::trace!("read {address:?} DDRB"),
       0b0011 => log::trace!("read {address:?} DDRA"),
-      0b0100 => log::trace!("read {address:?} T1C-L"),
+      0b0100 => {
+        // read T1C-L, clear T1 interrupt flag
+        self.clear_ifr_bits(1 << 6);
+//      let result = ((self.t1c & 0x00FF) >> 0) as u8;
+//      log::trace!("read {address:?} T1C-L -> {result}");
+//      return result;
+      },
       0b0101 => log::trace!("read {address:?} T1C-H"),
       0b0110 => log::trace!("read {address:?} T1L-L"),
       0b0111 => log::trace!("read {address:?} T1L-H"),
@@ -85,7 +136,10 @@ impl<P: Port> MemoryBus for VIA<P> {
       0b1010 => log::trace!("read {address:?} SR"),
       0b1011 => log::trace!("read {address:?} ACR"),
       0b1100 => log::trace!("read {address:?} PCR"),
-      0b1101 => log::trace!("read {address:?} IFR"),
+      0b1101 => {
+        let ifr = self.ifr.get();
+        log::trace!("read {address:?} IFR -> {ifr}");
+      },
       0b1110 => { 
         let result = self.ier | BIT7; // When read, bit 7 is *always* a logic 1
         log::trace!("read {address:?} IER -> {result}");
@@ -105,11 +159,12 @@ impl<P: Port> MemoryBus for VIA<P> {
     match address.to_u16() & 0x000F {
       0b0000 => {
         log::trace!("write {value:#04x} -> {address:?} IORB");
-        self.iorb = Self::mask_bits(self.iorb, value, self.ddrb);               
-//      if self.acr & 0b0000_0010 == 0 {                                        
-//        // latching disabled, write straight to port B                        
-//        self.port_b.write(value, self.ddrb);                                             
-//      }            
+        self.iorb = Self::mask_bits(self.iorb, value, self.ddrb);
+//      if self.acr & 0b0000_0010 == 0 {
+//        // latching disabled, write straight to port B
+//        self.port_b.write(value, self.ddrb);
+//      }
+        self.update_ifr_irq();
         return;
       },
       0b0001 => {
@@ -119,16 +174,17 @@ impl<P: Port> MemoryBus for VIA<P> {
           // latching disabled, write straight to port A
           self.port_a.write(value, self.ddra);
         }
+        self.update_ifr_irq();
         return;
       },
       0b0010 => {
         log::trace!("write {value:#04x} -> {address:?} DDRB");
-        self.ddrb = value; //todo
+        self.ddrb = value;
         return;
       },
       0b0011 => {
         log::trace!("write {value:#04x} -> {address:?} DDRA");
-        self.ddra = value; // todo
+        self.ddra = value;
         return;
       },
       0b0100 => log::trace!("write {value:#04x} -> {address:?} T1C-L"),
@@ -145,14 +201,22 @@ impl<P: Port> MemoryBus for VIA<P> {
       },
       0b1100 => log::trace!("write {value:#04x} -> {address:?} PCR"),
       0b1101 => log::trace!("write {value:#04x} -> {address:?} IFR"),
-      0b1110 => log::trace!("write {value:#04x} -> {address:?} IER"),
+      0b1110 => {
+        log::trace!("write {value:#04x} -> {address:?} IER");
+        if value & BIT7 != 0 {
+          self.ier |= value & NBIT7;
+        } else {
+          self.ier &= ! (value & NBIT7);
+        }
+        self.update_ifr_irq();
+      },
       0b1111 => {
         log::trace!("write {value:#04x} -> {address:?} IORAnh");
         self.port_a.write(value, self.ddra);
+        self.update_ifr_irq();
       },
       _      => unreachable!(),
     };
   }
 }
-
 
