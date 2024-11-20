@@ -4,10 +4,11 @@ pub mod disassemble;
 mod instructions;
 pub mod registers;
 
-use registers::Registers;
+use disassemble::disassemble_with_address;
 use instructions::{Instruction, handle_interrupt};
+use registers::Registers;
 
-use crate::memory::{Address, MemoryBus, read_address};
+use crate::memory::{Address, MemoryBus, read_address, slice};
 
 #[derive(Debug)]
 pub struct CPU {
@@ -40,7 +41,7 @@ impl CPU {
     let instruction = Instruction::lookup(opcode);
     instruction.execute(&mut self.registers, memory);
     self.cycles += 1;
-//  log::trace!("{self:?}");
+//  self.trace(memory);
   }
 
   #[allow(unused)]
@@ -72,6 +73,14 @@ impl CPU {
     while !stop(&self, memory) {
       self.step(memory);
     }
+  }
+
+  #[allow(unused)]
+  fn trace(&self, memory: &dyn MemoryBus) {
+    let address = self.registers.pc;
+    let operand = &slice(memory, address, 3);
+    let disassembly = disassemble_with_address(address, operand);
+    log::trace!("{disassembly: <40} {self:?}");
   }
 }
 

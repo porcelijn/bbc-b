@@ -1,7 +1,11 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::memory::{Address, MemoryBus};
-use crate::mos6522::{SystemVIA, SystemPortA, UserVIA, UserPortA};
+use crate::mos6522::{UserVIA, UserPortA, UserPortB};
+use crate::mos6522::ic32::IC32;
+use crate::mos6522::keyboard::Keyboard;
+use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
 //  SHEILA Integrated Description Section address circuit number (offset from
 //  &FE00)
@@ -74,8 +78,12 @@ impl SheilaPage {
   pub fn new() -> Self {
     let crtc = RefCell::new(CRTC{});
     let acia = RefCell::new(ACIA{});
-    let system_via = RefCell::new(SystemVIA::new(SystemPortA{}));
-    let user_via = RefCell::new(UserVIA::new(UserPortA{}));
+    let ic32 = Rc::new(IC32::new());
+    let keyboard = Rc::new(Keyboard::new());
+    let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
+    let system_port_b = SystemPortB::new(ic32);
+    let system_via = RefCell::new(SystemVIA::new(system_port_a, system_port_b));
+    let user_via = RefCell::new(UserVIA::new(UserPortA{}, UserPortB{}));
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
     SheilaPage { crtc, acia, system_via, user_via, device_todo }
   }
