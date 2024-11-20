@@ -113,3 +113,4 @@ fn test_dip_switch() {
   assert_eq!(kb.read(0, 8), false);
   assert_eq!(kb.read(0, 9), true);
 }
+

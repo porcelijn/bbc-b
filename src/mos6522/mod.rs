@@ -4,7 +4,8 @@ pub mod system_via;
 
 use std::cell::Cell;
 
-use crate::memory::{Address, devices::Device, MemoryBus};
+use crate::memory::{Address, MemoryBus};
+use crate::devices::Device;
 
 pub trait Port: std::fmt::Debug {
   // I/O lines PA0-7 / PB0-7

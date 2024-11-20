@@ -3,10 +3,10 @@ use std::path::Path;
 use std::io::prelude::*;
 use std::fs::File;
 
+use bbc_b::devices::{DevicePage, SheilaPage};
 use bbc_b::mos6502::{CPU, stop_after};
 use bbc_b::mos6502::disassemble::disassemble_with_address;
 use bbc_b::memory::{Address, PageDispatcher, ram::RAM, slice};
-use bbc_b::memory::devices::{DevicePage, SheilaPage};
 
 fn dump(filename: &str, bytes: &[u8]) {
   let path = Path::new(filename);

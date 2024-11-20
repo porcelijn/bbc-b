@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use super::{Port, VIA};
 use super::ic32::IC32;
 use super::keyboard::Keyboard;
-use crate::memory::devices::Device;
+use crate::devices::Device;
 
 //  &40–&5F 6522 VIA SYSTEM VIA
 pub type SystemVIA = VIA<SystemPortA, SystemPortB>;

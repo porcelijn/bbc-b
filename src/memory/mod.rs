@@ -1,4 +1,3 @@
-pub mod devices;
 pub mod ram;
 
 //  SHEILA Integrated Description Section address circuit number (offset from
@@ -128,7 +127,7 @@ impl MemoryBus for PageDispatcher {
 #[test]
 fn page_dispatcher() {
   use crate::memory::ram::RAM;
-  use crate::memory::devices::{DevicePage, SheilaPage};
+  use crate::devices::{DevicePage, SheilaPage};
   let ram = RAM::new();
   let mut memory = PageDispatcher::new(Box::new(ram));
   let sheila = SheilaPage::new();

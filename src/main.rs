@@ -1,6 +1,6 @@
 use bbc_b::mos6502::{CPU, stop_after};
+use bbc_b::devices::{DevicePage, SheilaPage};
 use bbc_b::memory::{Address, MemoryBus, PageDispatcher, read_address, slice};
-use bbc_b::memory::devices::{DevicePage, SheilaPage};
 use bbc_b::memory::ram::RAM;
 
 fn main() {
