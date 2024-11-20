@@ -1,10 +1,14 @@
+pub mod ic32;
+pub mod keyboard;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use ic32::IC32;
+use keyboard::Keyboard;
+
 use crate::memory::{Address, MemoryBus};
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
-use crate::mos6522::ic32::IC32;
-use crate::mos6522::keyboard::Keyboard;
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
 //  SHEILA Integrated Description Section address circuit number (offset from

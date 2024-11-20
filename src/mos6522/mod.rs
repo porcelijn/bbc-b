@@ -1,5 +1,3 @@
-pub mod ic32;
-pub mod keyboard;
 pub mod system_via;
 
 use std::cell::Cell;

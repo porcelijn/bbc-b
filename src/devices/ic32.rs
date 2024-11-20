@@ -1,5 +1,11 @@
-// FIXME: "ic32", the addressable latch probably should not live under 6522 VIA
-// 74LS259
+//
+// "ic32", is an 8 bit addressable latch (74LS259) controlling
+// - the slow memory bus
+// - CRTC mode adjus wrapping offset
+// - keyboard leds
+// 3 address lines are wired to bits PB0-PB2 of system VIA
+// 1 data line is connected to PB3 of system VIA
+//
 
 use std::cell::Cell;
 

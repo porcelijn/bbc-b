@@ -1,4 +1,7 @@
-// FIXME: The keyboard probably should not live under 6522 VIA
+// The keyboard consists of 8 rows, 10 columns of wires
+// bottom row (a. o. SHIFT, CTRL) does not cause interrupts
+// bottom row 2-9 is wired to a dip switch that controls boot options
+//
 
 const MAX_COL: u8 = 10;
 
