@@ -87,7 +87,7 @@ impl SheilaPage {
     let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     let system_port_b = SystemPortB::new(ic32);
     let system_via = RefCell::new(SystemVIA::new(system_port_a, system_port_b));
-    let user_via = RefCell::new(UserVIA::new(UserPortA{}, UserPortB{}));
+    let user_via = RefCell::new(UserVIA::new(UserPortA::new(0), UserPortB::new(0)));
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
     SheilaPage { crtc, acia, system_via, user_via, device_todo }
   }
