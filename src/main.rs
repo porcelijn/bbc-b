@@ -24,6 +24,7 @@ fn main() {
 //println!("My first BBC-B emulator");
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
+  ram.load_bin_at("images/Basic2.rom", Address::from(0x8000));
 
   let irq_vector = Address::from(0xFFFE);
   assert_eq!(read_address(&ram, irq_vector).to_u16(), 0xDC1C); // as per MOS

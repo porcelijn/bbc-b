@@ -14,7 +14,7 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 * No timing or cycle counting whatsoever
 * Memory is flat 64kB RAM --- Needs some way to add memory mapped I/O, maybe
   write protect ROM area, bank switching, ...
-* needs mos6522 for system VIA to build some kind of keyboard interface
+* has 10% of mos6522 for system VIA and rudiments of keyboard interface
 * needs quick 'n' dirty frame buffer to see what's going on (do proper video
   ULA and 6845 later)
 * OMG, [Toby Nelson](https://tobylobster.github.io/mos/mos/index.html)'s
@@ -38,7 +38,7 @@ Progress: after clearing the SHEILA page (all zeroes; RAM rather than mapped
 devices), I'm seeing:
 
 ```
-%  hd dump.bin 
+% hd dump.bin 
 00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
 *
 00007c00  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
@@ -60,7 +60,19 @@ fails to find the BASIC rom at 0x8000-0xC000. Which is fair, because it's not
 loaded, yet.
 
 ---
-Added interception of call to `OSWRCH`, forwarding `A` register (character to write) to standard out.
-No working keyboard yet, but this should simplify interactive debugging and regression tests.
+Added interception of calls to `OSWRCH`, forwarding `A` register (character to
+write) to standard out. No working keyboard yet, but this should simplify
+interactive debugging and regression tests.
 
 ![Screenshot-24-11-21](https://github.com/user-attachments/assets/ea84a206-f68b-4dc0-b3d8-1f5de787584f)
+
+...And after adding stuffing the Basic ROM at `0x8000`, the `Language?` error disappears as well:
+
+```
+
+BBC Computer 32K
+
+BASIC
+
+█
+```
