@@ -1,5 +1,5 @@
 
-use bbc_b::mos6502::{CPU, stop_after, stop_when};
+use bbc_b::mos6502::{CPU, IRQ, NMI, stop_after, stop_when};
 use bbc_b::memory::{Address, MemoryBus, ram::RAM};
 
 fn load_program() -> (RAM, Address, Address, Address) {
@@ -50,11 +50,16 @@ fn load_program() -> (RAM, Address, Address, Address) {
   ram.write(IRQ_VECTOR,        irq_entry.lo_u8());
   ram.write(IRQ_VECTOR.next(), irq_entry.hi_u8());
 
+  // setup NMI vector
+  const NMI_VECTOR: Address = Address::from(0xFFFA);
+  ram.write(NMI_VECTOR,        irq_entry.lo_u8());
+  ram.write(NMI_VECTOR.next(), irq_entry.hi_u8());
+
   (ram, start, end, irq_entry)
 }
 
 #[test]
-fn test_interrupt() {
+fn test_no_interrupt() {
   let (mut ram, start, end, _) = load_program();
 
   // Run without interruption
@@ -75,7 +80,7 @@ fn test_interrupt() {
 }
 
 #[test]
-fn test_no_interrupt() {
+fn test_interrupt() {
   let (mut ram, start, end, irq_entry) = load_program();
 
   // Interrupt after 100 "cycles"
@@ -92,8 +97,8 @@ fn test_no_interrupt() {
   assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
   assert_eq!(cpu.registers.a, 0xFF);
 
-//println!("handle interrupt");
-  cpu.handle_irq(&mut ram);
+  cpu.raise_irq();
+  cpu.step(&mut ram);
   // We're servicing the interrupt, going step-by-step
   assert_eq!(cpu.registers.pc, irq_entry);
   assert!(cpu.registers.p.has::<'I'>());
@@ -116,6 +121,52 @@ fn test_no_interrupt() {
   assert_eq!(cpu.registers.x, 230); // not depleted
   assert_eq!(cpu.registers.s.to_u8(), 0xFF); // Initial value
   assert!(!cpu.registers.p.has::<'I'>());
+}
+
+#[test]
+fn test_nmi() {
+  let (mut ram, start, end, irq_entry) = load_program();
+
+  // Interrupt after 100 "cycles"
+  // - stopped at END label (pc = 0xFF27)
+  // - accumulator == 1 on exit -> success
+  // - X != 0 -> watchdog not depleted
+  let mut cpu = CPU::new();
+  cpu.registers.pc = start;
+  // disabling interrups doesn't affect non-maskable interrupts
+  cpu.registers.p.set_flag::<'I', true>();
+
+  const BRK: u8 = 0x0;
+  cpu.run(&mut ram, &stop_after::<100>);
+
+  // stopped arbitrarily aftes 100 "cycles", we're somewhere in spin loop
+  assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
+  assert_eq!(cpu.registers.a, 0xFF);
+
+  cpu.raise_nmi();
+  cpu.step(&mut ram);
+  // We're servicing the interrupt, going step-by-step
+  assert_eq!(cpu.registers.pc, irq_entry);
+  assert!(cpu.registers.p.has::<'I'>());
+  assert!(!cpu.registers.p.has::<'B'>());
+
+  cpu.step(&mut ram); // 1
+  assert_eq!(cpu.registers.pc, irq_entry.next().next()); // @ RTI, now
+  assert!(cpu.registers.p.has::<'I'>());
+  assert!(!cpu.registers.p.has::<'B'>());
+  cpu.step(&mut ram); // 2
+
+  assert_eq!(cpu.registers.pc, Address::from(0xFF0E)); // back spin loop 
+  assert!(cpu.registers.p.has::<'I'>()); // interrupt still masked
+
+  // run till END
+  cpu.run(&mut ram, &stop_when::<BRK>);
+
+  assert_eq!(cpu.registers.pc, end);
+  assert_eq!(cpu.registers.a, 1); // SUCCESS
+  assert_eq!(cpu.registers.x, 230); // not depleted
+  assert_eq!(cpu.registers.s.to_u8(), 0xFF); // Initial value
+  assert!(cpu.registers.p.has::<'I'>()); // Initial value
 }
 
  

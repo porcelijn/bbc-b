@@ -4,6 +4,8 @@ pub mod disassemble;
 mod instructions;
 pub mod registers;
 
+use std::cell::Cell;
+
 use disassemble::disassemble_with_address;
 use instructions::{Instruction, handle_interrupt};
 use registers::Registers;
@@ -14,6 +16,8 @@ use crate::memory::{Address, MemoryBus, read_address, slice};
 pub struct CPU {
   pub registers: Registers,
   pub cycles: u64,
+  irq_level: Cell<bool>,
+  nmi_level: Cell<bool>,
 }
 
 type Breakpoint = dyn Fn(&CPU, &dyn MemoryBus) -> bool;
@@ -33,38 +37,61 @@ pub fn stop_at<const ADDRESS: u16>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
   cpu.registers.pc.to_u16() == ADDRESS
 }
 
+pub trait IRQ { fn raise_irq(&self); }
+impl IRQ for CPU {
+  fn raise_irq(&self) {
+    self.irq_level.set(true);
+  }
+}
+pub trait NMI { fn raise_nmi(&self); }
+impl NMI for CPU {
+  fn raise_nmi(&self) {
+    self.nmi_level.set(true);
+  }
+}
+
 impl CPU {
   const NMI_VECTOR:     u16 = 0xFFFA;
   const RESET_VECTOR:   u16 = 0xFFFC;
   const IRQ_BRK_VECTOR: u16 = 0xFFFE;
   pub fn new() -> Self {
-    CPU { registers: Registers::new(), cycles: 0 }
+    CPU { registers: Registers::new(),
+          cycles: 0,
+          irq_level: Cell::new(false),
+          nmi_level: Cell::new(false),
+    }
   }
 
   pub fn step(&mut self, memory: &mut dyn MemoryBus) {
-    let opcode = memory.read(self.registers.pc);
-    let instruction = Instruction::lookup(opcode);
-    instruction.execute(&mut self.registers, memory);
-    self.cycles += 1;
+    if self.nmi_level.get() {
+      self.nmi_level.set(false);
+      self.handle_nmi(memory);
+    } else if self.irq_level.get() && !self.registers.p.has::<'I'>() {
+      self.irq_level.set(false);
+      self.handle_irq(memory);
+    } else {
+      let opcode = memory.read(self.registers.pc);
+      let instruction = Instruction::lookup(opcode);
+      instruction.execute(&mut self.registers, memory);
+      self.cycles += 1;
+    }
 //  self.trace(memory);
   }
 
-  #[allow(unused)]
-  pub fn handle_irq(&mut self, memory: &mut dyn MemoryBus) {
+  fn handle_irq(&mut self, memory: &mut dyn MemoryBus) {
     self.registers.p.set_flag::<'B', false>();
     handle_interrupt::<{Self::IRQ_BRK_VECTOR}>(&mut self.registers, memory);
     self.cycles += 1;
   }
 
-  #[allow(unused)]
-  pub fn handle_nmi(&mut self, memory: &mut dyn MemoryBus) {
+  fn handle_nmi(&mut self, memory: &mut dyn MemoryBus) {
     self.registers.p.set_flag::<'B', false>();
     handle_interrupt::<{Self::NMI_VECTOR}>(&mut self.registers, memory);
     self.cycles += 1;
   }
 
   #[allow(unused)]
-  pub fn reset(&mut self, memory: &mut dyn MemoryBus) {
+  pub fn handle_rst(&mut self, memory: &mut dyn MemoryBus) {
     // https://www.pagetable.com/?p=410
     self.registers.a = 0xAA;
     *self.registers.s.borrow_mut() = 0xFD;           // cycles 0-5

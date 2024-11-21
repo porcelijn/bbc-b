@@ -23,7 +23,7 @@ fn os120_reset() {
   // Use whatever garbage is in the MOS 1.20 image at SHEILA addresses
 
   let mut cpu = CPU::new();
-  cpu.reset(&mut ram);
+  cpu.handle_rst(&mut ram);
   assert_eq!(cpu.registers.pc, Address::from(0xD9CD)); // .resetEntryPoint
   for _ in 0..10 {
     let slice = slice(&mut ram, cpu.registers.pc, 3);
@@ -55,7 +55,7 @@ fn os120_reset_with_sheila() {
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   let mut cpu = CPU::new();
-  cpu.reset(&mut mem);
+  cpu.handle_rst(&mut mem);
   assert_eq!(cpu.registers.pc, Address::from(0xD9CD)); // .resetEntryPoint
   for _ in 0..10 {
     let slice = slice(&mut mem, cpu.registers.pc, 3);

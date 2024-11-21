@@ -2,8 +2,9 @@ pub mod system_via;
 
 use std::cell::Cell;
 
+use crate::devices::{Clocked, Device};
 use crate::memory::{Address, MemoryBus};
-use crate::devices::Device;
+use crate::mos6502::IRQ;
 
 pub trait Port: std::fmt::Debug {
   // Control lines CA1-2 / CB1-2
@@ -60,6 +61,7 @@ pub struct VIA<PA: Port, PB: Port> {
   ier: u8,            // interrupt enable mask
 
   port_a: PA, port_b: PB,
+  clock_ms: Cell<u64>,
 }
 
 const BIT7: u8  = 1u8 << 7;
@@ -91,7 +93,8 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
                     acr: 0, pcr: 0,
                     ifr: Cell::new(0), ier: 0,
 
-                    port_a, port_b
+                    port_a, port_b,
+                    clock_ms: Cell::new(0),
     }
   }
 
@@ -101,40 +104,6 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
 
   pub fn interrupt_requested(&self) -> bool {
     self.ifr.get() & BIT7 != 0
-  }
-
-  pub fn step(&mut self, ticks: u16) {
-    let (ca1, ca2) = self.port_a.control();
-    if ca1 {
-      self.set_ifr_bits(Self::IFR_CA1_BIT);
-    }
-
-    if ca2 {
-      self.set_ifr_bits(Self::IFR_CA2_BIT);
-    }
-
-    if self.t1c <= ticks {
-      let difference = ticks - self.t1c;
-      self.set_ifr_bits(Self::IFR_T1_BIT);
-      if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
-        // free run
-        assert!(difference <= self.t1l);
-        self.t1c = self.t1l - difference;
-      } else {
-        // one shot
-        self.t1c = 0xFFFF - difference;
-      }
-      self.update_port_b7();
-    } else {
-      self.t1c -= ticks;
-    }
-
-    if self.t2c <= ticks {
-      self.set_ifr_bits(Self::IFR_T2_BIT);
-    }
-
-    // one-shot just continues counting (from 0xffff)
-    self.t2c = self.t2c.wrapping_sub(ticks);
   }
 
   fn clear_ifr_bits(&self, bits: u8) {
@@ -334,6 +303,51 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
   }
 }
 
+impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
+  fn step(&mut self, ms: u64) {
+    let ticks: u16 = {
+      let prev_ms = self.clock_ms.get();
+      assert!(prev_ms < ms);
+      let ticks = ms - prev_ms;
+      self.clock_ms.set(ms);
+      assert!(ticks < 0x10000);
+      ticks as u16
+    };
+
+    let (ca1, ca2) = self.port_a.control();
+    if ca1 {
+      self.set_ifr_bits(Self::IFR_CA1_BIT);
+    }
+
+    if ca2 {
+      self.set_ifr_bits(Self::IFR_CA2_BIT);
+    }
+
+    if self.t1c <= ticks {
+      let difference = ticks - self.t1c;
+      self.set_ifr_bits(Self::IFR_T1_BIT);
+      if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
+        // free run
+        assert!(difference <= self.t1l);
+        self.t1c = self.t1l - difference;
+      } else {
+        // one shot
+        self.t1c = 0xFFFF - difference;
+      }
+      self.update_port_b7();
+    } else {
+      self.t1c -= ticks;
+    }
+
+    if self.t2c <= ticks {
+      self.set_ifr_bits(Self::IFR_T2_BIT);
+    }
+
+    // one-shot just continues counting (from 0xffff)
+    self.t2c = self.t2c.wrapping_sub(ticks);
+  }
+}
+
 #[test]
 fn via_ca1() {
   let pa = BogusPort::<'A'>::new(1); // CA1 is high
@@ -364,7 +378,7 @@ fn via_timer1() {
   assert!(!via.interrupt_requested());
   assert_eq!(via.port_b.read(0), 0);
   via.write(Address::from(5), 0); // T1C-high
-  via.step(100);
+  via.step(200);
   assert!(via.interrupt_requested());
   assert_eq!(via.port_b.read(0), 0); // Auxiliary control bit 7 not set
 
@@ -375,7 +389,7 @@ fn via_timer1() {
   // ACR square wave on Port B bit 7
   via.write(Address::from(11), 1 << 7); // ACR_T1_PB7_BIT
   via.write(Address::from(5), 128); // T1C-high; restart timer
-  via.step(100);
+  via.step(300);
 //assert!(via.interrupt_requested());
 //assert_eq!(via.port_b.read(0), 0x80);
 }

@@ -3,13 +3,23 @@ pub mod keyboard;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::vec::Vec;
 
 use ic32::IC32;
 use keyboard::Keyboard;
 
 use crate::memory::{Address, MemoryBus};
+use crate::mos6502::IRQ;
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
+
+
+pub trait Clocked {
+  // ms - absolute clock time in milliseconds (MHz)
+  fn step(&mut self, ms: u64);
+}
+
+pub type ClockedDevices = Vec<Rc<RefCell<dyn Clocked>>>;
 
 //  SHEILA Integrated Description Section address circuit number (offset from
 //  &FE00)
@@ -73,7 +83,7 @@ pub trait DevicePage<const PAGE: u8> : MemoryBus {
 pub struct SheilaPage {
   crtc: RefCell<CRTC>,
   acia: RefCell<ACIA>,
-  system_via: RefCell<SystemVIA>,
+  system_via: Rc<RefCell<SystemVIA>>,
   user_via: RefCell<UserVIA>,
   device_todo: RefCell<UnimplementedDevice>,
 }
@@ -86,10 +96,16 @@ impl SheilaPage {
     let keyboard = Rc::new(Keyboard::new());
     let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     let system_port_b = SystemPortB::new(ic32);
-    let system_via = RefCell::new(SystemVIA::new(system_port_a, system_port_b));
+    let system_via = Rc::new(RefCell::new(SystemVIA::new(system_port_a, system_port_b)));
     let user_via = RefCell::new(UserVIA::new(UserPortA::new(0), UserPortB::new(0)));
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
     SheilaPage { crtc, acia, system_via, user_via, device_todo }
+  }
+
+  pub fn get_clocked_devices(&self) -> ClockedDevices {
+    let mut devices = ClockedDevices::new();
+    devices.push(self.system_via.clone());
+    devices
   }
 
   fn get_device(&self, address: Address) -> &RefCell<dyn Device> {
@@ -103,7 +119,7 @@ impl SheilaPage {
         }
       },
       //...
-      0x40 | 0x50 => &self.system_via,
+      0x40 | 0x50 => &*self.system_via,
       0x60 | 0x70 => &self.user_via,
       _ => &self.device_todo, // to be removed
     }
