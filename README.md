@@ -58,3 +58,9 @@ So it looks like we've landed in MODE 7, where the initialization loop detected
 correct amount of memory, tried to set up devices and interrupt vectors but
 fails to find the BASIC rom at 0x8000-0xC000. Which is fair, because it's not
 loaded, yet.
+
+---
+Added interception of call to `OSWRCH`, forwarding `A` register (character to write) to standard out.
+No working keyboard yet, but this should simplify interactive debugging and regression tests.
+
+![Screenshot-24-11-21](https://github.com/user-attachments/assets/ea84a206-f68b-4dc0-b3d8-1f5de787584f)
