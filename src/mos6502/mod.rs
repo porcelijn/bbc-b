@@ -28,6 +28,11 @@ pub fn stop_after<const CYCLES: u64>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
   cpu.cycles >= CYCLES
 }
 
+#[allow(unused)]
+pub fn stop_at<const ADDRESS: u16>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
+  cpu.registers.pc.to_u16() == ADDRESS
+}
+
 impl CPU {
   const NMI_VECTOR:     u16 = 0xFFFA;
   const RESET_VECTOR:   u16 = 0xFFFC;
