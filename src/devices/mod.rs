@@ -29,7 +29,7 @@ trait BogusDevice : Device {}
 
 impl<D: BogusDevice> MemoryBus for D {
   fn read(&self, _address: Address) -> u8 {
-    0xFF // bogus
+    0x00 // bogus value, seems to least confuse interrupt handling
   }
   fn write(&mut self, _address: Address, _value: u8) {
     // bogus

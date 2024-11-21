@@ -28,6 +28,19 @@ impl SystemPortA {
 // - SN76489 sound generator
 // - Speech synthesizer
 impl Port for SystemPortA {
+  fn control(&self) -> (bool, bool) {
+    // TODO: CA1 input — This is the vertical sync input from the 6845. CA1 is
+    // set up to interrupt the 6502 every 20 ms (50 Hz) as a vertical sync from
+    // the video circuitry is detected.
+    let ca1 = false;
+
+    // CA2 input from keyboard circuit when ic32 latch set to auto scan
+    let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();
+    let ca2 = auto_scan && self.keyboard.scan_interrupt();
+
+    (ca1, ca2)
+  }
+
   fn read(&self, ddr_mask: u8) -> u8 {
     let mut value = self.pa; // retrieve last value
 
@@ -90,6 +103,16 @@ impl SystemPortB {
 }
 
 impl Port for SystemPortB {
+  fn control(&self) -> (bool, bool) {
+    // TODO The CB1 input is the end of conversion (EOC) signal from the 7002
+    // analogue to digital converter
+    let cb1 = false;
+    // CB2 input is the light pen strobe signal sent by 6845 video processor
+    let cb2 = false;
+
+    (cb1, cb2)
+  }
+
   fn read(&self, ddr_mask: u8) -> u8 {
     // PB4 and PB5: joystick buttons
     // PB6 and PB7: inputs from speech processor (interrupt & ready, resp)

@@ -19,7 +19,7 @@ impl Keyboard {
     Keyboard { matrix: [0; MAX_COL as usize] }
   }
 
-  pub fn read(&self, row: u8, col: u8) -> bool {
+  fn read(&self, row: u8, col: u8) -> bool {
     // row connects to System VIA PA4..PA6 through IC2 data selector (74LS251)
     // col connects to System VIA PA0..PA3 through IC1 synch bin ctr (74LS163)
     assert!(row < 8 && col < MAX_COL);
@@ -28,7 +28,7 @@ impl Keyboard {
     value
   }
 
-  pub fn write(&mut self, row: u8, col: u8, value: bool) {
+  fn write(&mut self, row: u8, col: u8, value: bool) {
     assert!(row < 8 && col < MAX_COL);
     if value {
       self.matrix[col as usize] |= Self::mask(row);
@@ -45,10 +45,19 @@ impl Keyboard {
       return false;
     }
 
-    let col = (0b0000_1111 & key_code) >> 0;
-    let row = (0b0111_0000 & key_code) >> 4;
+    let (row, col) = Self::decode(key_code);
     let pressed = self.read(row, col);
     pressed
+  }
+
+  pub fn press_key(&mut self, key_code: u8) {
+    let (row, col) = Self::decode(key_code);
+    self.write(row, col, true);
+  }
+
+  pub fn release_key(&mut self, key_code: u8) {
+    let (row, col) = Self::decode(key_code);
+    self.write(row, col, false);
   }
 
   // if true, send CA1 to system VIA
@@ -84,18 +93,35 @@ impl Keyboard {
       mask >>= 1;
     }
   }
+
+  fn decode(key_code: u8) -> (u8, u8) {
+    let col = (0b0000_1111 & key_code) >> 0;
+    let row = (0b0111_0000 & key_code) >> 4;
+    (row, col)
+  }
 }
 
 #[test]
 fn press_keyboard() {
   let mut kb = Keyboard::new();
+  // diagonally press and release keys
+  for key in 1..8 {
+    assert_eq!(kb.scan_interrupt(), false);
+    kb.write(key, key, true);
+    assert_eq!(kb.scan_interrupt(), true);
+    assert!(kb.is_key_pressed(key << 4 | key));
+    kb.write(key, key, false);
+    assert_eq!(kb.scan_interrupt(), false);
+  }
+
   assert_eq!(kb.scan_interrupt(), false);
   for key in 0..74 {
     let col = key / 8;
     let row = key % 8;
-    println!("{key} {row} {col}");
+    let key_code = row << 4 | col;
+    println!("{key_code:x} {row} {col}");
     assert_eq!(kb.read(row, col), false);
-    kb.write(row, col, true);
+    kb.press_key(key_code);
     assert_eq!(kb.read(row, col), true);
   }
   assert_eq!(kb.scan_interrupt(), true);

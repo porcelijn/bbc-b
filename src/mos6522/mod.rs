@@ -6,6 +6,8 @@ use crate::memory::{Address, MemoryBus};
 use crate::devices::Device;
 
 pub trait Port: std::fmt::Debug {
+  // Control lines CA1-2 / CB1-2
+  fn control(&self) -> (bool, bool);
   // I/O lines PA0-7 / PB0-7
   fn read(&self, ddr_mask: u8) -> u8;
   fn write(&mut self, value: u8, ddr_mask: u8);
@@ -17,6 +19,10 @@ impl<const ID: char> BogusPort<ID> {
   pub const fn new(value: u8) -> Self { Self(value) }
 }
 impl<const ID: char> Port for BogusPort<ID> {
+  fn control(&self) -> (bool, bool) {
+    // c1 true if contained value non-zero
+    (self.0 != 0, false)
+  }
   // A 0 in a bit of the DDR causes corresponding peripheral pin to act as input
   fn read(&self, ddr_mask: u8) -> u8 {
     let result = self.0 & !ddr_mask;
@@ -98,8 +104,7 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
   }
 
   pub fn step(&mut self, ticks: u16) {
-    let (ca1, ca2) = (false, false); // TODO
-  
+    let (ca1, ca2) = self.port_a.control();
     if ca1 {
       self.set_ifr_bits(Self::IFR_CA1_BIT);
     }
@@ -130,8 +135,6 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
 
     // one-shot just continues counting (from 0xffff)
     self.t2c = self.t2c.wrapping_sub(ticks);
-
-    assert!(self.ifr.get() & Self::IFR_CA1_BIT == 0);
   }
 
   fn clear_ifr_bits(&self, bits: u8) {
@@ -329,6 +332,20 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
       _      => unreachable!(),
     };
   }
+}
+
+#[test]
+fn via_ca1() {
+  let pa = BogusPort::<'A'>::new(1); // CA1 is high
+  let pb = BogusPort::<'B'>::new(0);
+  let mut via = VIA::new(pa, pb);
+  assert!(!via.interrupt_requested());
+  via.write(Address::from(14), BIT7 | 1 << 1); // set IER_CA1_BIT
+  assert!(!via.interrupt_requested()); // enabled, but CA1 not scanned yet
+  via.step(1);
+  assert!(via.interrupt_requested());
+  via.write(Address::from(14), 1 << 1); // clear IER_CA1_BIT, mask interrupt
+  assert!(!via.interrupt_requested());
 }
 
 #[test]
