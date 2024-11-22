@@ -3,19 +3,23 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 
 * ALU does binary `ADC`/`SBC`, shifts and rotates, bit wise Boolean, ...
 * Addressing modes tested in original prototype
-* Stack, register transfers, ...
+* Stack, register transfers, load & store
 * Branch, jump and subroutines
-* `BRK` and rudimentary IRQ and NMI handling
+* `BRK` and IRQ and NMI handling
 * 6502 disassembler
-* preliminary benchmark performance ~7e7 instructions / second
+* Preliminary benchmark performance ~7e7 instructions / second
+* Memory page dispatcher routes `0xFE00-FF` to SHEILA mapped I/O (under
+  construction)
+* Snoop `OSWRCH` and pipe output to terminal — allows us to see what's going on
+  despite lack of video circuit emulation
 ## todo
 * Instruction execution puts PC increment in wrong place
-* Missing all peripherals
 * No timing or cycle counting whatsoever
-* Memory is flat 64kB RAM --- Needs some way to add memory mapped I/O, maybe
-  write protect ROM area, bank switching, ...
-* has 10% of mos6522 for system VIA and rudiments of keyboard interface
-* needs quick 'n' dirty frame buffer to see what's going on (do proper video
+* Missing 99% peripherals
+* Has only 10% of mos6522 logic for system VIA and rudiments of keyboard
+  interface
+* Write protect ROM area, paged ROM/RAM bank switching, JIM, FRED, ...
+* Needs quick 'n' dirty frame buffer to see what's going on (do proper video
   ULA and 6845 later)
 * OMG, [Toby Nelson](https://tobylobster.github.io/mos/mos/index.html)'s
   annotated MOS assembly is a treasure!

@@ -1,5 +1,5 @@
 
-use bbc_b::mos6502::{CPU, IRQ, NMI, stop_after, stop_when};
+use bbc_b::mos6502::{CPU, stop_after, stop_when};
 use bbc_b::memory::{Address, MemoryBus, ram::RAM};
 
 fn load_program() -> (RAM, Address, Address, Address) {
@@ -97,7 +97,7 @@ fn test_interrupt() {
   assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
   assert_eq!(cpu.registers.a, 0xFF);
 
-  cpu.raise_irq();
+  cpu.irq_level.raise();
   cpu.step(&mut ram);
   // We're servicing the interrupt, going step-by-step
   assert_eq!(cpu.registers.pc, irq_entry);
@@ -143,7 +143,7 @@ fn test_nmi() {
   assert_eq!(cpu.registers.pc, Address::from(0xFF0E));
   assert_eq!(cpu.registers.a, 0xFF);
 
-  cpu.raise_nmi();
+  cpu.nmi_level.raise();
   cpu.step(&mut ram);
   // We're servicing the interrupt, going step-by-step
   assert_eq!(cpu.registers.pc, irq_entry);

@@ -1,10 +1,10 @@
 pub mod system_via;
 
 use std::cell::Cell;
+use std::rc::Rc;
 
-use crate::devices::{Clocked, Device};
+use crate::devices::{Clocked, Device, Signal};
 use crate::memory::{Address, MemoryBus};
-use crate::mos6502::IRQ;
 
 pub trait Port: std::fmt::Debug {
   // Control lines CA1-2 / CB1-2
@@ -48,6 +48,8 @@ impl Device for UserVIA {
 
 #[derive(Debug)]
 pub struct VIA<PA: Port, PB: Port> {
+  pub irq: Rc<Signal>,// shared, hard-wired to other IRQ sources for logic "OR"
+
   iora: u8,           // input / output
   iorb: u8,
   ddra: u8,           // data direction registers
@@ -84,26 +86,25 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
   const ACR_T1_REPEAT_BIT: u8 = 1 << 6; // T1 continuous interrupts (0=on load)
   const ACR_T1_PB7_BIT:    u8 = 1 << 7; // T1 PB7 one shot / square wave
 
-  pub const fn new(port_a: PA, port_b: PB) -> Self {
-    VIA::<PA, PB>{  iora: 0, iorb: 0,
-                    ddra: 0, ddrb: 0,
-                    t1l: 0, t2l: 0,
-                    t1c: 0, t2c: 0,
-                    sr: 0,
-                    acr: 0, pcr: 0,
-                    ifr: Cell::new(0), ier: 0,
+  pub fn new(port_a: PA, port_b: PB) -> Self {
+    VIA::<PA, PB>{
+      irq: Rc::new(Signal::new()),
 
-                    port_a, port_b,
-                    clock_ms: Cell::new(0),
+      iora: 0, iorb: 0,
+      ddra: 0, ddrb: 0,
+      t1l: 0, t2l: 0,
+      t1c: 0, t2c: 0,
+      sr: 0,
+      acr: 0, pcr: 0,
+      ifr: Cell::new(0), ier: 0,
+
+      port_a, port_b,
+      clock_ms: Cell::new(0),
     }
   }
 
   const fn mask_bits(register: u8, value: u8, mask: u8) -> u8 {
     (register & !mask) | (value & mask)
-  }
-
-  pub fn interrupt_requested(&self) -> bool {
-    self.ifr.get() & BIT7 != 0
   }
 
   fn clear_ifr_bits(&self, bits: u8) {
@@ -128,6 +129,7 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
     let ifr_mask = ifr & NBIT7;
     if ier_mask & ifr_mask != 0 {
       ifr |= BIT7;
+      self.irq.raise();
     } else {
       ifr &= NBIT7;
     }
@@ -282,14 +284,30 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
       },
       0b1101 => {
         log::trace!("write {value:#04x} -> {address:?} IFR");
-        self.ifr.set(value);
+        // individual flag bits may be cleared by writing a Logic 1 into the
+        // appropriate bit of the IFR.
+        let mut ifr_mask = self.ifr.get();
+        ifr_mask &= !value & NBIT7;
+        self.ifr.set(ifr_mask);
+        self.update_ifr_irq();
       },
       0b1110 => {
+        // To set or clear a particular Interrupt Enable bit, the
+        // microprocessor must write to the IER address. During this write
+        // operation, if IER7 is Logic 0, each Logic 1 in IER6 thru IER0 will
+        // clear the corresponding bit in the IER. For each Logic 0 in IER6
+        // thru IER0, the corresponding bit in the IER will be unaffected.
+        //
+        // Setting selected bits in the IER is accomplished by writing to the
+        // same address with IER7 set to a Logic 1. In this case, each Logic 1
+        // in IER6 through IER0 will set the corresponding bit to a Logic 1.
+        // For each Logic 0 the corresponding bit will be unaffected.
         log::trace!("write {value:#04x} -> {address:?} IER");
+        let mask = value & NBIT7;
         if value & BIT7 != 0 {
-          self.ier |= value & NBIT7;
+          self.ier |= mask;
         } else {
-          self.ier &= ! (value & NBIT7);
+          self.ier &= ! mask;
         }
         self.update_ifr_irq();
       },
@@ -353,13 +371,14 @@ fn via_ca1() {
   let pa = BogusPort::<'A'>::new(1); // CA1 is high
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
-  assert!(!via.interrupt_requested());
+  assert!(!via.irq.sense());
   via.write(Address::from(14), BIT7 | 1 << 1); // set IER_CA1_BIT
-  assert!(!via.interrupt_requested()); // enabled, but CA1 not scanned yet
+  assert!(!via.irq.sense()); // enabled, but CA1 not scanned yet
   via.step(1);
-  assert!(via.interrupt_requested());
+  assert!(via.irq.sense());
   via.write(Address::from(14), 1 << 1); // clear IER_CA1_BIT, mask interrupt
-  assert!(!via.interrupt_requested());
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(!via.irq.sense());
 }
 
 #[test]
@@ -368,23 +387,25 @@ fn via_timer1() {
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
   via.step(100);
-  assert!(!via.interrupt_requested());
+  assert!(!via.irq.sense());
   via.write(Address::from(14), BIT7 | 1 << 6); // set IER_T1_BIT
-  assert!(via.interrupt_requested());
+  assert!(via.irq.sense());
   via.write(Address::from(13), 1 << 6); // clear IFR_T1_BIT
-  assert!(!via.interrupt_requested());
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(!via.irq.sense());
   via.write(Address::from(6), 1); // T1L-low
   // timer won't start till we write to T1 high latch
-  assert!(!via.interrupt_requested());
+  assert!(!via.irq.sense());
   assert_eq!(via.port_b.read(0), 0);
   via.write(Address::from(5), 0); // T1C-high
   via.step(200);
-  assert!(via.interrupt_requested());
+  assert!(via.irq.sense());
   assert_eq!(via.port_b.read(0), 0); // Auxiliary control bit 7 not set
 
   // read clears interrupt
   let v = via.read(Address::from(4)); // T1C-low
-  assert!(!via.interrupt_requested());
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(!via.irq.sense());
   assert_eq!(v, 155);
   // ACR square wave on Port B bit 7
   via.write(Address::from(11), 1 << 7); // ACR_T1_PB7_BIT

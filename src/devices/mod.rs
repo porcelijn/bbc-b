@@ -1,7 +1,7 @@
 pub mod ic32;
 pub mod keyboard;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -9,10 +9,24 @@ use ic32::IC32;
 use keyboard::Keyboard;
 
 use crate::memory::{Address, MemoryBus};
-use crate::mos6502::IRQ;
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
+#[derive(Debug)]
+pub struct Signal(Cell<bool>);
+impl Signal {
+  pub const fn new() -> Self {
+    Signal(Cell::new(false))
+  }
+
+  pub fn raise(&self) {
+    self.0.set(true);
+  }
+
+  pub fn sense(&self) -> bool {
+    self.0.replace(false)
+  }
+}
 
 pub trait Clocked {
   // ms - absolute clock time in milliseconds (MHz)
@@ -86,6 +100,7 @@ pub struct SheilaPage {
   system_via: Rc<RefCell<SystemVIA>>,
   user_via: RefCell<UserVIA>,
   device_todo: RefCell<UnimplementedDevice>,
+  pub irq: Rc<Signal>,
 }
 
 impl SheilaPage {
@@ -96,10 +111,14 @@ impl SheilaPage {
     let keyboard = Rc::new(Keyboard::new());
     let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     let system_port_b = SystemPortB::new(ic32);
-    let system_via = Rc::new(RefCell::new(SystemVIA::new(system_port_a, system_port_b)));
-    let user_via = RefCell::new(UserVIA::new(UserPortA::new(0), UserPortB::new(0)));
+    let system_via = SystemVIA::new(system_port_a, system_port_b);
+    let irq = system_via.irq.clone();
+    let system_via = Rc::new(RefCell::new(system_via));
+    let mut user_via = UserVIA::new(UserPortA::new(0), UserPortB::new(0));
+    user_via.irq = irq.clone(); // connect IRQB wires for logic "OR"
+    let user_via = RefCell::new(user_via);
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
-    SheilaPage { crtc, acia, system_via, user_via, device_todo }
+    SheilaPage { crtc, acia, system_via, user_via, device_todo, irq }
   }
 
   pub fn get_clocked_devices(&self) -> ClockedDevices {

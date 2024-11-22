@@ -1,7 +1,7 @@
 use std::io::{stdout, Write};
 
 use bbc_b::mos6502::{CPU, stop_at};
-use bbc_b::devices::{DevicePage, SheilaPage};
+use bbc_b::devices::{ClockedDevices, DevicePage, SheilaPage};
 use bbc_b::memory::{Address, PageDispatcher, read_address};
 use bbc_b::memory::ram::RAM;
 
@@ -29,16 +29,18 @@ fn main() {
   let irq_vector = Address::from(0xFFFE);
   assert_eq!(read_address(&ram, irq_vector).to_u16(), 0xDC1C); // as per MOS
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let mut cpu = CPU::new();
   let sheila = SheilaPage::new();
-       use bbc_b::devices::ClockedDevices;
+  let irq_level = sheila.irq.clone();
   let clocked_devices: ClockedDevices = sheila.get_clocked_devices();
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   // intercept calls to "OS write character" (ie. BBC Basic II VDU commands)
   // and translate to STDOUT
   let break_oswrch = stop_at::<0xFFEE>;
+  let mut cpu = CPU::new();
+  cpu.irq_level = irq_level;
   cpu.handle_rst(&mut mem);
+
   loop {
     if break_oswrch(&cpu, &mem) {
       vdu_to_terminal(cpu.registers.a);

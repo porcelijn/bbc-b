@@ -4,20 +4,21 @@ pub mod disassemble;
 mod instructions;
 pub mod registers;
 
-use std::cell::Cell;
+use std::rc::Rc;
 
 use disassemble::disassemble_with_address;
 use instructions::{Instruction, handle_interrupt};
 use registers::Registers;
 
 use crate::memory::{Address, MemoryBus, read_address, slice};
+use crate::devices::Signal;
 
 #[derive(Debug)]
 pub struct CPU {
   pub registers: Registers,
   pub cycles: u64,
-  irq_level: Cell<bool>,
-  nmi_level: Cell<bool>,
+  pub irq_level: Rc<Signal>,
+  pub nmi_level: Rc<Signal>,
 }
 
 type Breakpoint = dyn Fn(&CPU, &dyn MemoryBus) -> bool;
@@ -37,19 +38,6 @@ pub fn stop_at<const ADDRESS: u16>(cpu: &CPU, mem: &dyn MemoryBus) -> bool {
   cpu.registers.pc.to_u16() == ADDRESS
 }
 
-pub trait IRQ { fn raise_irq(&self); }
-impl IRQ for CPU {
-  fn raise_irq(&self) {
-    self.irq_level.set(true);
-  }
-}
-pub trait NMI { fn raise_nmi(&self); }
-impl NMI for CPU {
-  fn raise_nmi(&self) {
-    self.nmi_level.set(true);
-  }
-}
-
 impl CPU {
   const NMI_VECTOR:     u16 = 0xFFFA;
   const RESET_VECTOR:   u16 = 0xFFFC;
@@ -57,17 +45,15 @@ impl CPU {
   pub fn new() -> Self {
     CPU { registers: Registers::new(),
           cycles: 0,
-          irq_level: Cell::new(false),
-          nmi_level: Cell::new(false),
+          irq_level: Rc::new(Signal::new()),
+          nmi_level: Rc::new(Signal::new()),
     }
   }
 
   pub fn step(&mut self, memory: &mut dyn MemoryBus) {
-    if self.nmi_level.get() {
-      self.nmi_level.set(false);
+    if self.nmi_level.sense() {
       self.handle_nmi(memory);
-    } else if self.irq_level.get() && !self.registers.p.has::<'I'>() {
-      self.irq_level.set(false);
+    } else if self.irq_level.sense() && !self.registers.p.has::<'I'>() {
       self.handle_irq(memory);
     } else {
       let opcode = memory.read(self.registers.pc);
