@@ -151,72 +151,104 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
       0b0000 => {
         // system via uses top four bits for reading, bottom four for writing
         // TODO: clear interrupt
-        let mut result = self.iorb & self.ddrb; // read output bits
+        let mut irb = self.iorb & self.ddrb; // read output bits
         if self.acr & Self::ACR_PB_LATCH_BIT != 0 {
           // read latch
-          result |= self.iorb & !self.ddrb;
+          irb |= self.iorb & !self.ddrb;
         } else {
           // read current port values
-          result |= self.port_b.read(self.ddrb);
+          irb |= self.port_b.read(self.ddrb);
 //        if self.acr & Self::ACR_T1_PB7_BIT != 0 {
-//          result = (result & 0b0111_1111) | self.t1pb7;
+//          irb = (irb & 0b0111_1111) | self.t1pb7;
 //        }
         }
-        log::trace!("read {address:?} IORB -> {result}");
-        return result;
+        log::trace!("read {address:?} IORB -> {irb:04x}");
+        irb
       },
       0b0001 => {
         // self.iora = self.port_a.read(self.ddra);
-        let result = self.iora;
-        log::trace!("read {address:?} IORA -> {result}");
-        return result;
+        let ira = self.iora;
+        log::trace!("read {address:?} IORA -> {ira:04x}");
+        ira
       },
-      0b0010 => log::trace!("read {address:?} DDRB"),
-      0b0011 => log::trace!("read {address:?} DDRA"),
+      0b0010 => {
+        let ddrb = self.ddrb;
+        log::trace!("read {address:?} DDRB -> {ddrb:#04x}");
+        ddrb
+      },
+      0b0011 => {
+        let ddra = self.ddra;
+        log::trace!("read {address:?} DDRA -> {ddra:#04x}");
+        ddra
+      },
       0b0100 => {
         // read T1C-L, clear T1 interrupt flag
         self.clear_ifr_bits(Self::IFR_T1_BIT);
-        let result = ((self.t1c & 0x00FF) >> 0) as u8;
-        log::trace!("read {address:?} T1C-L -> {result}");
-        return result;
+        let t1clock_lo = ((self.t1c & 0x00FF) >> 0) as u8;
+        log::trace!("read {address:?} T1C-L -> {t1clock_lo}");
+        t1clock_lo
       },
-      0b0101 => log::trace!("read {address:?} T1C-H"),
-      0b0110 => log::trace!("read {address:?} T1L-L"),
-      0b0111 => log::trace!("read {address:?} T1L-H"),
+      0b0101 => {
+        let t1clock_hi =((self.t1c & 0xFF00) >> 8) as u8;
+        log::trace!("read {address:?} T1C-H -> {t1clock_hi:#04x}");
+        t1clock_hi
+      },
+      0b0110 => {
+        let t1latch_lo =((self.t1l & 0x00FF) >> 0) as u8;
+        log::trace!("read {address:?} T1L-L -> {t1latch_lo:#04x}");
+        t1latch_lo
+      },
+      0b0111 => {
+        let t1latch_hi =((self.t1l & 0xFF00) >> 8) as u8;
+        log::trace!("read {address:?} T1L-H -> {t1latch_hi:#04x}");
+        t1latch_hi
+      },
       0b1000 => {
         // read T2C-l, clear T2 interrupt flag
         self.clear_ifr_bits(Self::IFR_T2_BIT);
         // one shot timer, stop
 //      self.t2_active = false;
-        log::trace!("read {address:?} T2C-L");
-        let result =((self.t2c & 0x00FF) >> 0) as u8;
-        return result;
+        let t2c_lo =((self.t2c & 0x00FF) >> 0) as u8;
+        log::trace!("read {address:?} T2C-L -> {t2c_lo:#04x}");
+        t2c_lo
       },
-      0b1001 => log::trace!("read {address:?} T2C-H"),
+      0b1001 => {
+        let t2c_hi  = ((self.t2c & 0xFF00) >> 8) as u8; // read T2C-H
+        log::trace!("read {address:?} T2C-H -> {t2c_hi:#04x}");
+        t2c_hi
+      },
       0b1010 => {
-        let sr = self.sr;
-        log::trace!("read {address:?} SR -> {sr:#04x}");
+        let shift_register = self.sr;
+        log::trace!("read {address:?} SR -> {shift_register:#04x}");
+        shift_register
       },
-      0b1011 => log::trace!("read {address:?} ACR"),
-      0b1100 => log::trace!("read {address:?} PCR"),
+      0b1011 => {
+        let acr = self.acr;
+        log::trace!("read {address:?} ACR -> {acr:#04x}");
+        acr
+      },
+      0b1100 => {
+        let pcr = self.pcr;
+        log::trace!("read {address:?} PCR -> {pcr:#04x}");
+        pcr
+      },
       0b1101 => {
         let ifr = self.ifr.get();
-        log::trace!("read {address:?} IFR -> {ifr}");
+        log::trace!("read {address:?} IFR -> {ifr:#04x}");
+        ifr
       },
       0b1110 => {
-        let result = self.ier | BIT7; // When read, bit 7 is *always* a logic 1
-        log::trace!("read {address:?} IER -> {result}");
-        return result;
+        let ier = self.ier | BIT7; // When read, bit 7 is *always* a logic 1
+        log::trace!("read {address:?} IER -> {ier:#04x}");
+        ier
       },
       0b1111 => {
-        let result = self.port_a.read(self.ddra);
-        log::trace!("read {address:?} IORAnh -> {result}");
-        return result;
+        let ira_nh = self.port_a.read(self.ddra);
+        log::trace!("read {address:?} IORAnh -> {ira_nh:#04x}");
+        ira_nh
       },
       _      => unreachable!(),
-    };
-
-    0xFF // bogus
+    }
   }
 
   fn write(&mut self, address: Address, value: u8) {
@@ -247,7 +279,10 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         log::trace!("write {value:#04x} -> {address:?} DDRA");
         self.ddra = value;
       },
-      0b0100 => log::trace!("write {value:#04x} -> {address:?} T1C-L"),
+      0b0100 => {
+        log::trace!("write {value:#04x} -> {address:?} T1C-L");
+        panic!("this ever used?!");
+      },
       0b0101 => {
         log::trace!("write {value:#04x} -> {address:?} T1C-H");
         // Write into high order latch and copy latch to counter
@@ -261,9 +296,26 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         self.clear_ifr_bits(Self::IFR_T1_BIT);
         //self.t1_active = true;
       },
-      0b0110 => log::trace!("write {value:#04x} -> {address:?} T1L-L"),
-      0b0111 => log::trace!("write {value:#04x} -> {address:?} T1L-H"),
-      0b1000 => log::trace!("write {value:#04x} -> {address:?} T2C-L"),
+      0b0110 => {
+        log::trace!("write {value:#04x} -> {address:?} T1L-L");
+        // write into low order latch
+        self.t1l &= 0xFF00;
+        self.t1l |= value as u16;
+      },
+      0b0111 => {
+        log::trace!("write {value:#04x} -> {address:?} T1L-H");
+        // Write into high order latch, clear T1 interrupt
+        self.t1l &= 0x00FF;
+        self.t1l |= (value as u16) << 8;
+        self.clear_ifr_bits(Self::IFR_T1_BIT);
+        //self.t1_active = false;
+      },
+      0b1000 => {
+        log::trace!("write {value:#04x} -> {address:?} T2C-L");
+        // write into low order T2 latch
+        self.t2l &= 0xFF00;
+        self.t2l |= value as u16;
+      },
       0b1001 => {
         log::trace!("write {value:#04x} -> {address:?} T2C-H");
         // Write into high order latch and copy latch to counter
@@ -273,7 +325,10 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         self.clear_ifr_bits(Self::IFR_T2_BIT);
         //self.t2_active = true;
       },
-      0b1010 => log::trace!("write {value:#04x} -> {address:?} SR"),
+      0b1010 => {
+        log::trace!("write {value:#04x} -> {address:?} SR");
+        self.sr = value;
+      },
       0b1011 => {
         log::trace!("write {value:#04x} -> {address:?} ACR");
         self.acr = value;
@@ -285,11 +340,8 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
       0b1101 => {
         log::trace!("write {value:#04x} -> {address:?} IFR");
         // individual flag bits may be cleared by writing a Logic 1 into the
-        // appropriate bit of the IFR.
-        let mut ifr_mask = self.ifr.get();
-        ifr_mask &= !value & NBIT7;
-        self.ifr.set(ifr_mask);
-        self.update_ifr_irq();
+        // appropriate bit of the IFR
+        self.clear_ifr_bits(value & NBIT7);
       },
       0b1110 => {
         // To set or clear a particular Interrupt Enable bit, the
@@ -397,7 +449,7 @@ fn via_timer1() {
   // timer won't start till we write to T1 high latch
   assert!(!via.irq.sense());
   assert_eq!(via.port_b.read(0), 0);
-  via.write(Address::from(5), 0); // T1C-high
+  via.write(Address::from(5), 0); // T1C-high, also T1L-low -> T1C-low
   via.step(200);
   assert!(via.irq.sense());
   assert_eq!(via.port_b.read(0), 0); // Auxiliary control bit 7 not set
@@ -406,7 +458,7 @@ fn via_timer1() {
   let v = via.read(Address::from(4)); // T1C-low
   via.update_ifr_irq(); // re-evaluate IRQ
   assert!(!via.irq.sense());
-  assert_eq!(v, 155);
+  assert_eq!(v, 156); // 255 + 1 (from t1l) - 100 ticks
   // ACR square wave on Port B bit 7
   via.write(Address::from(11), 1 << 7); // ACR_T1_PB7_BIT
   via.write(Address::from(5), 128); // T1C-high; restart timer
