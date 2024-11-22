@@ -21,8 +21,9 @@ impl<const ID: char> BogusPort<ID> {
 }
 impl<const ID: char> Port for BogusPort<ID> {
   fn control(&self) -> (bool, bool) {
-    // c1 true if contained value non-zero
-    (self.0 != 0, false)
+    // c1 true if contained value 1
+    // c2 true if contained value 0
+    (self.0 == 1, self.0 == 2)
   }
   // A 0 in a bit of the DDR causes corresponding peripheral pin to act as input
   fn read(&self, ddr_mask: u8) -> u8 {
@@ -64,6 +65,7 @@ pub struct VIA<PA: Port, PB: Port> {
 
   port_a: PA, port_b: PB,
   clock_ms: Cell<u64>,
+  t1_active: Cell<bool>, t2_active: Cell<bool>,
 }
 
 const BIT7: u8  = 1u8 << 7;
@@ -73,16 +75,16 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
   const IFR_CA2_BIT: u8 = 1 << 0; // set: active edge CA2, clear: r/w ORA*
   const IFR_CA1_BIT: u8 = 1 << 1; // set: active edge CA1, clear: r/w ORA
 //const IFR_SR_BIT:  u8 = 1 << 2; // set: complete 8 shifts, clear: r/w SR
-//const IFR_CB2_BIT: u8 = 1 << 3; // set: active edge CB2, clear: r/w ORB*
-//const IFR_CB1_BIT: u8 = 1 << 4; // set: active edge CB1, clear: r/w ORB
+  const IFR_CB2_BIT: u8 = 1 << 3; // set: active edge CB2, clear: r/w ORB*
+  const IFR_CB1_BIT: u8 = 1 << 4; // set: active edge CB1, clear: r/w ORB
   const IFR_T2_BIT:  u8 = 1 << 5; // set: timeout T2, clear: r T2 low / w T2 high
   const IFR_T1_BIT:  u8 = 1 << 6; // set: timeout T1, clear: r T1C low / w T1L high
 //const IFR_IRQ_BIT: u8 = BIT7;   // set: any above, clear: clear all interrupts
 
   const ACR_PA_LATCH_BIT:  u8 = 1 << 0; // PA enable latching
   const ACR_PB_LATCH_BIT:  u8 = 1 << 1; // set: active edge CA1, clear: r/w ORA
-//// ACR 2-4: SR control (8 shift register modes; all 0 = disabled)
-//const ACR_T2_PB6_BIT:    u8 = 1 << 5; // T2 count down with each PB6 pulse
+  // ACR 2-4: SR control (8 shift register modes; all 0 = disabled)
+  const ACR_T2_PB6_BIT:    u8 = 1 << 5; // T2 count down with each PB6 pulse
   const ACR_T1_REPEAT_BIT: u8 = 1 << 6; // T1 continuous interrupts (0=on load)
   const ACR_T1_PB7_BIT:    u8 = 1 << 7; // T1 PB7 one shot / square wave
 
@@ -100,11 +102,22 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
 
       port_a, port_b,
       clock_ms: Cell::new(0),
+      t1_active: Cell::new(false), 
+      t2_active: Cell::new(false), 
     }
   }
 
   const fn mask_bits(register: u8, value: u8, mask: u8) -> u8 {
     (register & !mask) | (value & mask)
+  }
+
+  const fn is_independent(cx2_control: u8) -> bool {
+    assert!(cx2_control < 8);
+    // Input-positive active edge
+    const INDEPENDENT_IRQ_NEG_EDGE: u8 = 1;
+    // Input-negative active edge
+    const INDEPENDENT_IRQ_POS_EDGE: u8 = 3;
+    cx2_control == INDEPENDENT_IRQ_NEG_EDGE || cx2_control == INDEPENDENT_IRQ_POS_EDGE
   }
 
   fn clear_ifr_bits(&self, bits: u8) {
@@ -150,7 +163,14 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
     match address.to_u16() & 0x000F {
       0b0000 => {
         // system via uses top four bits for reading, bottom four for writing
-        // TODO: clear interrupt
+        let cb2_control = (self.pcr & 0b1110_0000) >> 5; // pcr5-7
+//      let cb1_control = (self.pcr & 0b0001_0000) >> 4; // pcr4
+        let bits = match Self::is_independent(cb2_control) {
+           true => Self::IFR_CB1_BIT,
+          false => Self::IFR_CB1_BIT | Self::IFR_CB2_BIT
+        };
+        self.clear_ifr_bits(bits);
+
         let mut irb = self.iorb & self.ddrb; // read output bits
         if self.acr & Self::ACR_PB_LATCH_BIT != 0 {
           // read latch
@@ -166,6 +186,13 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         irb
       },
       0b0001 => {
+        let ca2_control = (self.pcr & 0b000_01110) >> 1; // pcr1-3
+        let bits = match Self::is_independent(ca2_control) {
+           true => Self::IFR_CA1_BIT,
+          false => Self::IFR_CA1_BIT | Self::IFR_CA2_BIT
+        };
+        self.clear_ifr_bits(bits);
+
         // self.iora = self.port_a.read(self.ddra);
         let ira = self.iora;
         log::trace!("read {address:?} IORA -> {ira:04x}");
@@ -207,7 +234,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         // read T2C-l, clear T2 interrupt flag
         self.clear_ifr_bits(Self::IFR_T2_BIT);
         // one shot timer, stop
-//      self.t2_active = false;
+        self.t2_active.set(false);
         let t2c_lo =((self.t2c & 0x00FF) >> 0) as u8;
         log::trace!("read {address:?} T2C-L -> {t2c_lo:#04x}");
         t2c_lo
@@ -260,7 +287,15 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
           // latching disabled, write straight to port B
           self.port_b.write(value, self.ddrb);
         }
-        self.update_ifr_irq();
+
+        // system via uses top four bits for reading, bottom four for writing
+        let cb2_control = (self.pcr & 0b1110_0000) >> 5; // pcr5-7
+//      let cb1_control = (self.pcr & 0b0001_0000) >> 4; // pcr4
+        let bits = match Self::is_independent(cb2_control) {
+           true => Self::IFR_CB1_BIT,
+          false => Self::IFR_CB1_BIT | Self::IFR_CB2_BIT
+        };
+        self.clear_ifr_bits(bits);
       },
       0b0001 => {
         log::trace!("write {value:#04x} -> {address:?} IORA");
@@ -269,7 +304,13 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
           // latching disabled, write straight to port A
           self.port_a.write(value, self.ddra);
         }
-        self.update_ifr_irq();
+
+        let ca2_control = (self.pcr & 0b000_01110) >> 1; // pcr1-3
+        let bits = match Self::is_independent(ca2_control) {
+           true => Self::IFR_CA1_BIT,
+          false => Self::IFR_CA1_BIT | Self::IFR_CA2_BIT
+        };
+        self.clear_ifr_bits(bits);
       },
       0b0010 => {
         log::trace!("write {value:#04x} -> {address:?} DDRB");
@@ -286,6 +327,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
       0b0101 => {
         log::trace!("write {value:#04x} -> {address:?} T1C-H");
         // Write into high order latch and copy latch to counter
+        // (re) start counter
         self.t1l &= 0x00FF;
         self.t1l |= (value as u16) << 8;
         self.t1c = self.t1l;
@@ -294,7 +336,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
           self.port_b.write(0, BIT7);
         }
         self.clear_ifr_bits(Self::IFR_T1_BIT);
-        //self.t1_active = true;
+        self.t1_active.set(true);
       },
       0b0110 => {
         log::trace!("write {value:#04x} -> {address:?} T1L-L");
@@ -308,7 +350,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         self.t1l &= 0x00FF;
         self.t1l |= (value as u16) << 8;
         self.clear_ifr_bits(Self::IFR_T1_BIT);
-        //self.t1_active = false;
+        self.t1_active.set(false);
       },
       0b1000 => {
         log::trace!("write {value:#04x} -> {address:?} T2C-L");
@@ -323,7 +365,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         self.t2l |= (value as u16) << 8;
         self.t2c = self.t2l;
         self.clear_ifr_bits(Self::IFR_T2_BIT);
-        //self.t2_active = true;
+        self.t2_active.set(true);
       },
       0b1010 => {
         log::trace!("write {value:#04x} -> {address:?} SR");
@@ -393,28 +435,36 @@ impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
       self.set_ifr_bits(Self::IFR_CA2_BIT);
     }
 
-    if self.t1c <= ticks {
-      let difference = ticks - self.t1c;
-      self.set_ifr_bits(Self::IFR_T1_BIT);
-      if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
-        // free run
-        assert!(difference <= self.t1l);
-        self.t1c = self.t1l - difference;
+    if self.t1_active.get() {
+      if self.t1c <= ticks {
+        let difference = ticks - self.t1c;
+        self.set_ifr_bits(Self::IFR_T1_BIT);
+
+        if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
+          // free run
+          assert!(difference <= self.t1l);
+          self.t1c = self.t1l - difference;
+        } else {
+          // one shot
+          self.t1_active.set(false);
+          self.t1c = 0xFFFF - difference;
+        }
+        self.update_port_b7();
       } else {
-        // one shot
-        self.t1c = 0xFFFF - difference;
+        self.t1c -= ticks;
       }
-      self.update_port_b7();
-    } else {
-      self.t1c -= ticks;
     }
 
-    if self.t2c <= ticks {
-      self.set_ifr_bits(Self::IFR_T2_BIT);
-    }
+    if self.acr & Self::ACR_T2_PB6_BIT == 0 {
+      // T2 triggered by phase 2 clock (timed interrupt)
+      if self.t2c <= ticks && self.t2_active.get() {
+        self.t2_active.set(false);
+        self.set_ifr_bits(Self::IFR_T2_BIT);
+      }
 
-    // one-shot just continues counting (from 0xffff)
-    self.t2c = self.t2c.wrapping_sub(ticks);
+      // one-shot just continues counting (from 0xffff)
+      self.t2c = self.t2c.wrapping_sub(ticks);
+    }
   }
 }
 
@@ -434,10 +484,35 @@ fn via_ca1() {
 }
 
 #[test]
+fn via_ca2() {
+  let pa = BogusPort::<'A'>::new(2); // CA2 is high
+  let pb = BogusPort::<'B'>::new(0);
+  let mut via = VIA::new(pa, pb);
+  assert!(!via.irq.sense());
+  via.write(Address::from(14), BIT7 | 1 << 0); // set IER_CA2_BIT
+  assert!(!via.irq.sense()); // enabled, but CA1 not scanned yet
+  via.step(1);
+  assert!(via.irq.sense());
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(via.irq.sense());
+  via.read(Address::from(1)); // clear by reading from IRA
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(!via.irq.sense());
+
+  via.step(2); // ca1 raises interrupt again
+  assert!(via.irq.sense());
+
+  via.write(Address::from(1), 42); // clear by writing o ORA
+  via.update_ifr_irq(); // re-evaluate IRQ
+  assert!(!via.irq.sense());
+}
+
+#[test]
 fn via_timer1() {
   let pa = BogusPort::<'A'>::new(0);
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
+  via.write(Address::from(5), 0); // activate t1
   via.step(100);
   assert!(!via.irq.sense());
   via.write(Address::from(14), BIT7 | 1 << 6); // set IER_T1_BIT
