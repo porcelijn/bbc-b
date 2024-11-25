@@ -60,6 +60,22 @@ impl Keyboard {
     self.write(row, col, false);
   }
 
+  pub fn press_key_ascii(&mut self, ascii: u8) {
+    let (key_code, shift) = ascii_to_key_code(ascii as char);
+    if shift {
+      self.write(0, 0, true); // press SHIFT
+    }
+    let (row, col) = Self::decode(key_code);
+    self.write(row, col, true);
+  }
+
+  pub fn release_key_ascii(&mut self, ascii: u8) {
+    let (key_code, _) = ascii_to_key_code(ascii as char);
+    let (row, col) = Self::decode(key_code);
+    self.write(row, col, false);
+    self.write(0, 0, false); // release SHIFT
+  }
+
   // if true, send CA1 to system VIA
   pub fn scan_interrupt(&self) -> bool {
     for col in 0 .. MAX_COL {
@@ -100,6 +116,100 @@ impl Keyboard {
     (row, col)
   }
 }
+
+const fn ascii_to_key_code(ascii: char) -> (u8, bool) {
+  let mut i = 0_usize;
+  while i < ASCII_TO_KEY_CODE.len() {
+    let pair = &ASCII_TO_KEY_CODE[i];
+    if ascii == pair.0 { return (pair.2, false); }
+    if ascii == pair.1 { return (pair.2, true); }
+    i += 1
+  }
+  unimplemented!();
+}
+
+// translate lower case ASCII, upper case, 7 bit key code
+const ASCII_TO_KEY_CODE: [(char, char, u8); 51] = [
+    ( ' ',  ' ',  0x62 ), // SPACE
+    ( '\t', '\t', 0x60 ), // TAB
+    ( '\n', '\r', 0x49 ), // Newline / RETURN
+    ( '0',  '0',  0x27 ),
+    ( '1',  '!',  0x30 ),
+    ( '2',  '"',  0x31 ),
+    ( '3',  '#',  0x11 ),
+    ( '4',  '$',  0x12 ),
+    ( '5',  '%',  0x13 ),
+    ( '6',  '&',  0x34 ),
+    ( '7',  '\'', 0x24 ),
+    ( '8',  '(',  0x15 ),
+    ( '9',  ')',  0x26 ),
+    ( '-',  '=',  0x17 ),
+    ( '^',  '~',  0x18 ),
+    ( '_',  '₤',  0x28 ),
+    ( '[',  '{',  0x38 ),
+    ( '@',  '@',  0x47 ),
+    ( ':',  '*',  0x48 ),
+    ( ';',  '+',  0x57 ),
+    ( ']',  '}',  0x58 ),
+    ( ',',  '<',  0x66 ),
+    ( '.',  '>',  0x67 ),
+    ( '/',  '/',  0x68 ),
+    ( '\\', '|',  0x78 ),
+    ( 'a',  'A',  0x41 ),
+    ( 'b',  'B',  0x64 ),
+    ( 'c',  'C',  0x52 ),
+    ( 'd',  'D',  0x32 ),
+    ( 'e',  'E',  0x22 ),
+    ( 'f',  'F',  0x43 ),
+    ( 'g',  'G',  0x53 ),
+    ( 'h',  'H',  0x54 ),
+    ( 'i',  'I',  0x25 ),
+    ( 'j',  'J',  0x45 ),
+    ( 'k',  'K',  0x46 ),
+    ( 'l',  'L',  0x56 ),
+    ( 'm',  'M',  0x65 ),
+    ( 'n',  'N',  0x55 ),
+    ( 'o',  'O',  0x36 ),
+    ( 'p',  'P',  0x37 ),
+    ( 'q',  'Q',  0x10 ),
+    ( 'r',  'R',  0x33 ),
+    ( 's',  'S',  0x51 ),
+    ( 't',  'T',  0x23 ),
+    ( 'u',  'U',  0x35 ),
+    ( 'v',  'V',  0x63 ),
+    ( 'w',  'W',  0x21 ),
+    ( 'x',  'X',  0x42 ),
+    ( 'y',  'Y',  0x44 ),
+    ( 'z',  'Z',  0x61 ),
+
+/* TODO:
+    (  'Shift Lock',  0x50 ),
+    (  'Shift',       0x00 ),
+    (  'Shift',       0x00 ),
+    (  'Delete',      0x59 ),
+    (  'Copy',        0x69 ),
+    (  'Left',        0x19 ),
+    (  'Right',       0x79 ),
+    (  'Up',          0x39 ),
+    (  'Down',        0x29 ),
+    (  'Caps Lock',   0x40 ),
+    (  'CTRL',        0x01 ),
+
+    (  'Escape',      0x70 ),
+    (  'F0',          0x20 ),
+    (  'F1',          0x71 ),
+    (  'F2',          0x72 ),
+    (  'F3',          0x73 ),
+    (  'F4',          0x14 ),
+    (  'F5',          0x74 ),
+    (  'F6',          0x75 ),
+    (  'F7',          0x16 ),
+    (  'F8',          0x76 ),
+    (  'F9',          0x77 ),
+    (  'Break',       0xff ),
+    */
+];
+
 
 #[test]
 fn press_keyboard() {
