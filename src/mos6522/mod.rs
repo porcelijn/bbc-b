@@ -192,9 +192,12 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
           false => Self::IFR_CA1_BIT | Self::IFR_CA2_BIT
         };
         self.clear_ifr_bits(bits);
-
-        // self.iora = self.port_a.read(self.ddra);
-        let ira = self.iora;
+       
+        let ira = if self.acr & Self::ACR_PA_LATCH_BIT != 0 {
+          self.iora
+        } else {
+          self.port_a.read(self.ddra)
+        };
         log::trace!("read {address:?} IORA -> {ira:04x}");
         ira
       },

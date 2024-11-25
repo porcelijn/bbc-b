@@ -122,9 +122,13 @@ fn press_keyboard() {
     println!("{key_code:x} {row} {col}");
     assert_eq!(kb.read(row, col), false);
     kb.press_key(key_code);
+    let causes_interrupt = row != 0; // SHIFT, CTRL, and dip switches don't IRQ
+    assert_eq!(kb.scan_interrupt(), causes_interrupt);
     assert_eq!(kb.read(row, col), true);
+    kb.release_key(key_code);
+    assert_eq!(kb.scan_interrupt(), false);
+    assert_eq!(kb.read(row, col), false);
   }
-  assert_eq!(kb.scan_interrupt(), true);
 }
 
 #[test]
