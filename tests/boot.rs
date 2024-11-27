@@ -47,11 +47,13 @@ fn os120_reset() {
 
 #[test]
 fn os120_reset_with_sheila() {
+  use std::rc::Rc;
+  use bbc_b::devices::keyboard::Keyboard;
 //simple_logger::init_with_level(log::Level::Trace).unwrap();
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new();
+  let sheila = SheilaPage::new(Rc::new(Keyboard::new()));
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   let mut cpu = CPU::new();

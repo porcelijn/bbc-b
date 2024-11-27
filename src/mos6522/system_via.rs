@@ -1,5 +1,6 @@
-use std::rc::Rc;
 use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::{Port, VIA};
 use crate::devices::{Device, ic32::IC32, keyboard::Keyboard};
@@ -14,11 +15,11 @@ impl Device for SystemVIA {
 pub struct SystemPortA {
   pa: u8,                 // latched PA0-7 pin value written or read
   ic32: Rc<IC32>,         // addressable latch
-  keyboard: Rc<Keyboard>,
+  keyboard: Rc<RefCell<Keyboard>>,
 }
 
 impl SystemPortA {
-  pub fn new(ic32: Rc<IC32>, keyboard: Rc<Keyboard>) -> Self {
+  pub fn new(ic32: Rc<IC32>, keyboard: Rc<RefCell<Keyboard>>) -> Self {
     SystemPortA { pa: 0, ic32, keyboard }
   }
 }
@@ -36,7 +37,7 @@ impl Port for SystemPortA {
 
     // CA2 input from keyboard circuit when ic32 latch set to auto scan
     let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();
-    let ca2 = auto_scan && self.keyboard.scan_interrupt();
+    let ca2 = auto_scan && self.keyboard.borrow().scan_interrupt();
 
     (ca1, ca2)
   }
@@ -47,7 +48,7 @@ impl Port for SystemPortA {
     let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();
     if !auto_scan {
       log::trace!("sysvia A: reading {value:x} from keyboard");
-      let key_pressed = self.keyboard.is_key_pressed(value);
+      let key_pressed = self.keyboard.borrow().is_key_pressed(value);
       // result in bit 7
       if key_pressed {
         value |= 0b1000_0000;

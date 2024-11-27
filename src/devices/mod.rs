@@ -104,11 +104,10 @@ pub struct SheilaPage {
 }
 
 impl SheilaPage {
-  pub fn new() -> Self {
+  pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
     let crtc = RefCell::new(CRTC{});
     let acia = RefCell::new(ACIA{});
     let ic32 = Rc::new(IC32::new());
-    let keyboard = Rc::new(Keyboard::new());
     let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     let system_port_b = SystemPortB::new(ic32);
     let system_via = SystemVIA::new(system_port_a, system_port_b);
