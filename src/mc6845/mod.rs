@@ -10,11 +10,15 @@ use crate::memory::{Address, MemoryBus};
 #[derive(Debug)]
 pub struct CRTC {
   pub vsync: Rc<Signal>,
+  clock_us: u64,
 }
 
 impl CRTC {
+  const FIFTY_HERZ: u64 = 20_000;
   pub fn new() -> Self {
-    CRTC { vsync: Rc::new(Signal::new()) }
+    let vsync = Rc::new(Signal::new());
+    let clock_us = 0;
+    CRTC { vsync, clock_us }
   }
 }
 
@@ -33,9 +37,12 @@ impl MemoryBus for CRTC {
 
 impl Clocked for CRTC {
   fn step(&mut self, us: u64) {
-    if us % 20_000 == 0 {
+    println!("{} < {}",self.clock_us , us); // can't go bakc in time
+    assert!(self.clock_us < us); // can't go bakc in time
+    if self.clock_us / Self::FIFTY_HERZ != us / Self::FIFTY_HERZ {
       self.vsync.raise();
     }
+    self.clock_us = us;
   }
 }
 
@@ -68,7 +75,5 @@ fn vsync_step3() {
     }
   }
 
-  // characterization, FIXME
-  // if we miss a time slice, no signal is raised
-  assert_eq!(count, 16); // SHOULD BE 50
+  assert_eq!(count, 49);
 }
