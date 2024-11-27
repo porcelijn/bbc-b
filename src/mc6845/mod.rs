@@ -33,7 +33,7 @@ impl MemoryBus for CRTC {
 
 impl Clocked for CRTC {
   fn step(&mut self, us: u64) {
-    if ms % 20_000 == 0 {
+    if us % 20_000 == 0 {
       self.vsync.raise();
     }
   }
@@ -46,11 +46,29 @@ fn vsync_step1() {
   let signal50hz = crtc.vsync.clone();
   let mut count = 0;
   for us in 0..1_000_000 {
-    crtc.step(ms);
+    crtc.step(us);
     if signal50hz.sense() {
       count += 1;
     }
   }
 
   assert_eq!(count, 50);
+}
+
+#[test]
+fn vsync_step3() {
+  // run for a second
+  let mut crtc = CRTC::new();
+  let signal50hz = crtc.vsync.clone();
+  let mut count = 0;
+  for us in (0..1_000_000).step_by(3) {
+    crtc.step(us);
+    if signal50hz.sense() {
+      count += 1;
+    }
+  }
+
+  // characterization, FIXME
+  // if we miss a time slice, no signal is raised
+  assert_eq!(count, 17); // SHOULD BE 50
 }

@@ -3,7 +3,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::{Port, VIA};
-use crate::devices::{Device, ic32::IC32, keyboard::Keyboard};
+use crate::devices::{Device, Signal};
+use crate::devices::ic32::IC32;
+use crate::devices::keyboard::Keyboard;
 
 //  &40–&5F 6522 VIA SYSTEM VIA
 pub type SystemVIA = VIA<SystemPortA, SystemPortB>;
@@ -13,14 +15,16 @@ impl Device for SystemVIA {
 
 #[derive(Debug)]
 pub struct SystemPortA {
-  pa: u8,                 // latched PA0-7 pin value written or read
-  ic32: Rc<IC32>,         // addressable latch
+  pub crtc_vsync: Rc<Signal>, // 6845 video controller for 50Hz vsync signal
+  pa: u8,                     // latched PA0-7 pin value written or read
+  ic32: Rc<IC32>,             // addressable latch
   keyboard: Rc<RefCell<Keyboard>>,
 }
 
 impl SystemPortA {
   pub fn new(ic32: Rc<IC32>, keyboard: Rc<RefCell<Keyboard>>) -> Self {
-    SystemPortA { pa: 0, ic32, keyboard }
+    let crtc_vsync = Rc::new(Signal::new());
+    SystemPortA { pa: 0, crtc_vsync, ic32, keyboard }
   }
 }
 
@@ -30,10 +34,10 @@ impl SystemPortA {
 // - Speech synthesizer
 impl Port for SystemPortA {
   fn control(&self) -> (bool, bool) {
-    // TODO: CA1 input — This is the vertical sync input from the 6845. CA1 is
-    // set up to interrupt the 6502 every 20 ms (50 Hz) as a vertical sync from
-    // the video circuitry is detected.
-    let ca1 = false;
+    // CA1 input — This is the vertical sync input from the 6845. CA1 is set up
+    // to interrupt the 6502 every 20 ms (50 Hz) as a vertical sync from the
+    // video circuitry is detected.
+    let ca1 = self.crtc_vsync.sense();
 
     // CA2 input from keyboard circuit when ic32 latch set to auto scan
     let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();

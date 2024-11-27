@@ -9,6 +9,7 @@ use ic32::IC32;
 use keyboard::Keyboard;
 
 use crate::memory::{Address, MemoryBus};
+use crate::mc6845::CRTC;
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
@@ -60,13 +61,6 @@ impl<D: BogusDevice> MemoryBus for D {
   }
 }
 
-//  &00–&07 6845 CRTC Video controller 18
-struct CRTC {}
-impl BogusDevice for CRTC {}
-impl Device for CRTC {
-  fn name(&self) -> &'static str { "6845 CRTC video controller" }
-}
-
 //  &08–&0F 6850 ACIA Serial controller 20.3
 struct ACIA {}
 impl BogusDevice for ACIA {}
@@ -95,7 +89,7 @@ pub trait DevicePage<const PAGE: u8> : MemoryBus {
 }
 
 pub struct SheilaPage {
-  crtc: RefCell<CRTC>,
+  crtc: Rc<RefCell<CRTC>>,
   acia: RefCell<ACIA>,
   system_via: Rc<RefCell<SystemVIA>>,
   user_via: RefCell<UserVIA>,
@@ -105,10 +99,12 @@ pub struct SheilaPage {
 
 impl SheilaPage {
   pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
-    let crtc = RefCell::new(CRTC{});
+    let crtc = CRTC::new();
     let acia = RefCell::new(ACIA{});
     let ic32 = Rc::new(IC32::new());
-    let system_port_a = SystemPortA::new(ic32.clone(), keyboard);
+    let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard);
+    system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
+    let crtc = Rc::new(RefCell::new(crtc));
     let system_port_b = SystemPortB::new(ic32);
     let system_via = SystemVIA::new(system_port_a, system_port_b);
     let irq = system_via.irq.clone();
@@ -122,6 +118,7 @@ impl SheilaPage {
 
   pub fn get_clocked_devices(&self) -> ClockedDevices {
     let mut devices = ClockedDevices::new();
+    devices.push(self.crtc.clone());
     devices.push(self.system_via.clone());
     devices
   }
@@ -131,7 +128,7 @@ impl SheilaPage {
     match address.lo_u8() & 0b1111_0000 {
       0x00 => {
         if address.lo_u8() & 0b0000_1000 == 0 {
-          &self.crtc
+          &*self.crtc
         } else {
           &self.acia
         }
