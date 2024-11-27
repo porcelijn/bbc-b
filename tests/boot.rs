@@ -1,6 +1,6 @@
-
-use std::path::Path;
+use std::cell::RefCell;
 use std::io::prelude::*;
+use std::path::Path;
 use std::fs::File;
 
 use bbc_b::devices::{DevicePage, SheilaPage};
@@ -53,7 +53,7 @@ fn os120_reset_with_sheila() {
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new(Rc::new(Keyboard::new()));
+  let sheila = SheilaPage::new(Rc::new(RefCell::new(Keyboard::new())));
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   let mut cpu = CPU::new();

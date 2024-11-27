@@ -126,13 +126,14 @@ impl MemoryBus for PageDispatcher {
 
 #[test]
 fn page_dispatcher() {
+  use std::cell::RefCell;
   use std::rc::Rc;
   use crate::memory::ram::RAM;
   use crate::devices::{DevicePage, SheilaPage};
   use crate::devices::keyboard::Keyboard;
   let ram = RAM::new();
   let mut memory = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new(Rc::new(Keyboard::new()));
+  let sheila = SheilaPage::new(Rc::new(RefCell::new(Keyboard::new())));
   memory.add_backend(SheilaPage::page(), Box::new(sheila));
   let addr = Address::from(0xFE00);
   memory.write(addr, 42);
