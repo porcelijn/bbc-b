@@ -87,7 +87,7 @@ pub const fn dec(register: u8) -> u8 {
 
 pub const fn asl(value: u8) -> (u8, bool) {
   let out_carry: bool = value & 0b1000_0000 != 0; // new carry is bit 7
-  let result = value.wrapping_shl(1);
+  let result = (value & 0b0111_1111) << 1;
   (result, out_carry)
 }
 
@@ -101,7 +101,7 @@ pub const fn rol(value: u8, in_carry: bool) -> (u8, bool) {
 
 pub const fn lsr(value: u8) -> (u8, bool) {
   let out_carry: bool = value & 0b0000_0001 != 0; // new carry is bit 0
-  let result = value.wrapping_shr(1);
+  let result = (value & 0b1111_1110) >> 1;
   (result, out_carry)
 }
 
@@ -188,4 +188,28 @@ fn sbc_decimal() {
 //assert_eq!(sub_decimal_with_carry(0x90, 0x0b, false), (0x7e, true, false));
 }
 
+#[test]
+fn shift_left() {
+  assert_eq!(asl(0b1000_0000),                 (0, true));
+  assert_eq!(asl(0b0000_0000),                 (0, false));
+  assert_eq!(asl(0b0000_0001),        (0b000_0010, false));
+  assert_eq!(rol(0b1000_0000, false),          (0, true));
+  assert_eq!(rol(0b1000_0000, true),           (1, true));
+  assert_eq!(rol(0b0000_0001, false),          (2, false));
+  assert_eq!(rol(0b0000_0001, true), (0b0000_0011, false));
+  assert_eq!(rol(0b0100_0000, false),(0b1000_0000, false));
+}
+
+#[test]
+fn shift_right() {
+  assert_eq!(lsr(0b0000_0001),                 (0, true));
+  assert_eq!(lsr(0b0000_0000),                 (0, false));
+  assert_eq!(lsr(0b1000_0000),       (0b0100_0000, false));
+  assert_eq!(lsr(0b1000_0001),       (0b0100_0000, true));
+  assert_eq!(ror(0b0000_0001, false),          (0, true));
+  assert_eq!(ror(0b0000_0001, true), (0b1000_0000, true));
+  assert_eq!(ror(0b0000_0010, false),(0b0000_0001, false));
+  assert_eq!(ror(0b1000_0000, false),(0b0100_0000, false));
+  assert_eq!(ror(0b1000_0000, true), (0b1100_0000, false));
+}
 
