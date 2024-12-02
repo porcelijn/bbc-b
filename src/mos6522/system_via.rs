@@ -41,7 +41,13 @@ impl Port for SystemPortA {
 
     // CA2 input from keyboard circuit when ic32 latch set to auto scan
     let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();
-    let ca2 = auto_scan && self.keyboard.borrow().scan_interrupt();
+    let ca2 = if auto_scan {
+      self.keyboard.borrow().scan_interrupt()
+    } else {
+      let key_code = self.pa;
+      let (_row, col) = Keyboard::decode(key_code);
+      self.keyboard.borrow().scan_column(col)
+    };
 
     (ca1, ca2)
   }

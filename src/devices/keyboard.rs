@@ -76,11 +76,23 @@ impl Keyboard {
     self.write(0, 0, false); // release SHIFT
   }
 
-  // if true, send CA1 to system VIA
+  // if true, send CA1 to system VIA (ic32 KB autoscan disabled)
+  pub fn scan_column(&self, col: u8) -> bool {
+    if col < MAX_COL {
+      // mask out row 0 (SHIFT, CRTL, dip switches)
+      return self.matrix[col as usize] & 0b1111_1110 != 0;
+    }
+
+    // .loopKeyboardColumns (MOS 0xFE03)
+    // selects a non-existent keyboard column 15 (0-9 only!)
+    assert_eq!(col, 15);
+    false
+  }
+
+  // if true, send CA1 to system VIA (ic32 KB autoscan enabled)
   pub fn scan_interrupt(&self) -> bool {
     for col in 0 .. MAX_COL {
-      // mask out row 0 (SHIFT, CRTL, dip switches)
-      if self.matrix[col as usize] & 0b1111_1110 != 0 {
+      if self.scan_column(col) {
         return true;
       }
     }
@@ -110,7 +122,7 @@ impl Keyboard {
     }
   }
 
-  fn decode(key_code: u8) -> (u8, u8) {
+  pub const fn decode(key_code: u8) -> (u8, u8) {
     let col = (0b0000_1111 & key_code) >> 0;
     let row = (0b0111_0000 & key_code) >> 4;
     (row, col)

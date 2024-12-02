@@ -37,7 +37,7 @@ fn interrogate_keyboard() {
 
   let mut ram = RAM::new();
   ram.load_at(&MOS_CLIP, start);
-  let mut keyboard = Rc::new(RefCell::new(Keyboard::new()));
+  let keyboard = Rc::new(RefCell::new(Keyboard::new()));
   let mut mem = PageDispatcher::new(Box::new(ram));
   let sheila = SheilaPage::new(keyboard.clone());
 
