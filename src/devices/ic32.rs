@@ -87,8 +87,9 @@ impl IC32 {
     };
     b2k
   }
-  
+
   pub fn write(&self, address: u8, value: bool) {
+    log::trace!("IC32[{address}] = {value}, {}", Self::get_message(address, value));
     let mut latch = self.0.get();
     if value {
       latch |=   Self::get_mask(address);

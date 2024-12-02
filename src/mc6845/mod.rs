@@ -37,8 +37,7 @@ impl MemoryBus for CRTC {
 
 impl Clocked for CRTC {
   fn step(&mut self, us: u64) {
-    println!("{} < {}",self.clock_us , us); // can't go bakc in time
-    assert!(self.clock_us < us); // can't go bakc in time
+    assert!(self.clock_us < us); // can't go back in time
     if self.clock_us / Self::FIFTY_HERZ != us / Self::FIFTY_HERZ {
       self.vsync.raise();
     }
