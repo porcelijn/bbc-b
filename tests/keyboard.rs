@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::io::prelude::*;
 use std::rc::Rc;
 
 use bbc_b::devices::{ClockedDevices, DevicePage, SheilaPage};
@@ -59,13 +58,13 @@ fn interrogate_keyboard() {
 
   let interrogate_keyboard = |cpu: &mut CPU, mem: &mut dyn MemoryBus| {
     cpu.registers.pc = start;
-    println!("Enterring .interrogate_keyboard with X={}", cpu.registers.x);
+    println!("Entering .interrogate_keyboard with X={}", cpu.registers.x);
     while !stop(cpu, mem) {
       let slice = slice(mem, cpu.registers.pc, 3);
       let dump = disassemble_with_address(cpu.registers.pc, &slice);
       cpu.step(mem);
       step(&cds, cpu.cycles);
-      println!("{dump} | a:{} x:{} y:{} p:{:?}", cpu.registers.a,
+      println!("{dump:<30} | a:{} x:{} y:{} p:{:?}", cpu.registers.a,
                cpu.registers.x, cpu.registers.y, cpu.registers.p,
       );
     }
@@ -74,7 +73,7 @@ fn interrogate_keyboard() {
   const PRESSED: u8 = 0x80;
 
   // Press '0' with CA2 masked, because default interrupt enable register = 0
-  if false {
+  {
     let key_code = 0x27; // '0'
     cpu.registers.x = key_code;
     interrogate_keyboard(&mut cpu, &mut mem);
