@@ -11,6 +11,7 @@ use keyboard::Keyboard;
 use crate::memory::{Address, MemoryBus};
 use crate::mc6845::CRTC;
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
+use crate::mos6522::alt_via::AltVIA;
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
 #[derive(Debug)]
@@ -30,8 +31,8 @@ impl Signal {
 }
 
 pub trait Clocked {
-  // ms - absolute clock time in milliseconds (MHz)
-  fn step(&mut self, ms: u64);
+  // us - absolute clock time in microseconds (MHz)
+  fn step(&mut self, us: u64);
 }
 
 pub type ClockedDevices = Vec<Rc<RefCell<dyn Clocked>>>;
@@ -91,10 +92,12 @@ pub trait DevicePage<const PAGE: u8> : MemoryBus {
 pub struct SheilaPage {
   crtc: Rc<RefCell<CRTC>>,
   acia: RefCell<ACIA>,
+  alt_sysvia: Rc<RefCell<AltVIA>>,
   system_via: Rc<RefCell<SystemVIA>>,
   user_via: RefCell<UserVIA>,
   device_todo: RefCell<UnimplementedDevice>,
   pub irq: Rc<Signal>,
+  pub use_alt_system_via: bool,
 }
 
 impl SheilaPage {
@@ -105,6 +108,7 @@ impl SheilaPage {
     let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
     let crtc = Rc::new(RefCell::new(crtc));
+    let alt_sysvia = Rc::new(RefCell::new(AltVIA::new()));
     let system_port_b = SystemPortB::new(ic32);
     let system_via = SystemVIA::new(system_port_a, system_port_b);
     let irq = system_via.irq.clone();
@@ -113,12 +117,16 @@ impl SheilaPage {
     user_via.irq = irq.clone(); // connect IRQB wires for logic "OR"
     let user_via = RefCell::new(user_via);
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
-    SheilaPage { crtc, acia, system_via, user_via, device_todo, irq }
+    SheilaPage { crtc, acia,
+                 alt_sysvia, system_via, user_via,
+                 device_todo, irq, use_alt_system_via: false,
+    }
   }
 
   pub fn get_clocked_devices(&self) -> ClockedDevices {
     let mut devices = ClockedDevices::new();
     devices.push(self.crtc.clone());
+    devices.push(self.alt_sysvia.clone());
     devices.push(self.system_via.clone());
     devices
   }
@@ -134,7 +142,11 @@ impl SheilaPage {
         }
       },
       //...
-      0x40 | 0x50 => &*self.system_via,
+      0x40 | 0x50 => if self.use_alt_system_via {
+        &*self.alt_sysvia
+      } else {
+        &*self.system_via
+      },
       0x60 | 0x70 => &self.user_via,
       _ => &self.device_todo, // to be removed
     }

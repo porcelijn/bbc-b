@@ -2,9 +2,15 @@
 name = "bbc-b"
 version = "0.1.0"
 edition = "2021"
+authors = [ "Porcelaine" ]
 
 [dependencies]
 log = "0.4"
+b-em-sysvia = { path = "crates/b-em-sysvia" }
 
 #[dev-dependencies]
-simple_logger = "5.0.0"
+#simple_logger = "5.0.0"
+
+[workspace]
+members = [ "crates/b-em-sysvia" ]
+

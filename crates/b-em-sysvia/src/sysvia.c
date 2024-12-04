@@ -71,7 +71,7 @@ uint8_t sdbval;
 static uint8_t sysvia_sdb_out;
 
 int scrsize;
-int kbdips;
+//int kbdips;
 
 /*Calculate current state of slow data bus
   B-em emulates three bus masters - the System VIA itself, the keyboard (bit 7
@@ -199,3 +199,8 @@ void sysvia_loadstate(FILE *f)
         scrsize=((IC32&16)?2:0)|((IC32&32)?1:0);
 }
 */
+
+void sysvia_poll(int cycles)
+{
+  via_poll(&sysvia, cycles);
+}
