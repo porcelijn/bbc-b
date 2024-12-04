@@ -211,7 +211,6 @@ fn loop_keyboard() {
                      // .finishKeyBoardScanning
   ];
 
-  const RTS: u8 = 0x60;
   let stop = stop_at::<0xF127>; // .finishKeyboardScanning lable, just beyond final TXA instruction
 
   let mut ram = RAM::new();
