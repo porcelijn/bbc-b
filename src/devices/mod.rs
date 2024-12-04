@@ -126,7 +126,7 @@ impl SheilaPage {
   pub fn get_clocked_devices(&self) -> ClockedDevices {
     let mut devices = ClockedDevices::new();
     devices.push(self.crtc.clone());
-    devices.push(self.alt_sysvia.clone());
+//  devices.push(self.alt_sysvia.clone());
     devices.push(self.system_via.clone());
     devices
   }
