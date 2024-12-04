@@ -103,7 +103,7 @@ const fn get_index_register<const XY: char>(registers: &Registers) -> &u8 {
 pub struct UseZeroPageWith<const XY: char>;
 impl<const XY: char> UseAddress for UseZeroPageWith<XY> {
   fn get_address(registers: &Registers, memory: &dyn MemoryBus) -> Address {
-    let register = get_index_register::<XY>(&registers);
+    let register = get_index_register::<XY>(registers);
     let operand = memory.read(registers.pc);
     let operand = operand.wrapping_add(*register);
     Address::from_le_bytes(operand, 0)
@@ -188,7 +188,7 @@ impl UseMode for UseAbsolute {
 pub struct UseAbsoluteWith<const XY: char>;
 impl<const XY: char> UseAddress for UseAbsoluteWith<XY> {
   fn get_address(registers: &Registers, memory: &dyn MemoryBus) -> Address {
-    let register = get_index_register::<XY>(&registers);
+    let register = get_index_register::<XY>(registers);
     let mut operand = read_address(memory, registers.pc);
     operand.inc_by(*register);
     operand

@@ -417,7 +417,7 @@ fn test_sbc_d0_minus_70() {
 }
 
 fn by_acc<AO: AccOp, AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  let value = AM::get_value(&registers, memory);
+  let value = AM::get_value(registers, memory);
   registers.pc.inc_by(AM::get_size());
   AO::call(&mut registers.a, &mut registers.p, value);
 }
@@ -486,7 +486,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registe
     'y'|'Y' => registers.y,
     _ => unimplemented!()
   };
-  let rhs = AM::get_value(&registers, memory);
+  let rhs = AM::get_value(registers, memory);
   const CARRY: bool = true;
 
   let (result, carry, overflow) =
@@ -502,7 +502,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registe
 }
 
 fn bit<AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  let value = AM::get_value(&registers, memory);
+  let value = AM::get_value(registers, memory);
   let status = alu::bit(registers.a, value, registers.p);
   registers.p = status;
   registers.pc.inc_by(AM::get_size());
@@ -533,13 +533,13 @@ fn dec_register<const XY: char, AM: UseMode>(registers: &mut Registers, _: &mut 
 }
 
 fn jump<AM: UseMode + UseAddress>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  let jump_address = AM::get_address(&registers, memory);
+  let jump_address = AM::get_address(registers, memory);
 //registers.pc.inc_by(AM::get_size());
   registers.pc = jump_address;
 }
 
 fn jump_sub<AM: UseMode + UseAddress>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  let jump_address = AM::get_address(&registers, memory);
+  let jump_address = AM::get_address(registers, memory);
   let mut return_address = registers.pc;
   return_address.inc_by(AM::get_size()); // next instruction
   return_address.dec_by(1);              // 6502 pushes last byte of instruction!
@@ -583,7 +583,7 @@ fn set_flag<const FLAG: char, const SET: bool, AM: UseMode>(registers: &mut Regi
 }
 
 fn load<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
-  let value = AM::get_value(&registers, memory);
+  let value = AM::get_value(registers, memory);
   let register_ref: &mut u8 = match REGISTER {
     'a'|'A' => &mut registers.a,
     'x'|'X' => &mut registers.x,

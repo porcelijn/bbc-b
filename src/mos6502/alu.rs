@@ -70,7 +70,7 @@ pub const fn ora(accumulator: u8, value: u8) -> u8 {
 pub fn bit(accumulator: u8, value: u8, mut status: Status) -> Status {
   // A is ANDed with the value in memory to set or clear the zero flag
   status.set::<'Z'>(accumulator & value == 0);
-   // Overflow is set to bit 6 of the memory value
+  // Overflow is set to bit 6 of the memory value
   status.set::<'V'>(0b0100_0000 & value != 0);
   // Negative is set to bit 7 of the memory value
   status.set::<'N'>(0b1000_0000 & value != 0);
