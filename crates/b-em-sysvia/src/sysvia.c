@@ -77,6 +77,8 @@ typedef struct state_t {
 //int kbdips;
   VIA* via;
   int interrupt;
+
+  int keyrow, keycol;
 } state_t;
 
 int get_interrupt(state_t const * const s)

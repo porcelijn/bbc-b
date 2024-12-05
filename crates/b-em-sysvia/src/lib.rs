@@ -54,6 +54,8 @@ pub struct State {
   via: *mut Cvia,
 //int kbdips;
   interrupt: u32,
+  keyrow: u32,
+  keycol: u32,
 }
 
 #[repr(C)]
@@ -72,8 +74,8 @@ extern {
 }
 
 //static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
-static mut KEYROW: u32 = 0;
-static mut KEYCOL: u32 = 0;
+//static mut KEYROW: u32 = 0;
+//static mut KEYCOL: u32 = 0;
 //static mut IC32: u32 = 0;
 static mut BBCMATRIX: [[bool; 8]; 10] = [[false; 8]; 10];
 
@@ -94,9 +96,9 @@ pub extern fn key_update(state: *mut State) {
   }
   else {
     /* scan specific key mode */
-    if unsafe { KEYCOL } < maxcol {
+    if unsafe { (*state).keycol } < maxcol {
       for row in 1..8 {
-        if unsafe { BBCMATRIX[KEYCOL as usize][row as usize] } {
+        if unsafe { BBCMATRIX[(*state).keycol as usize][row as usize] } {
           unsafe { sysvia_set_ca2(cvia, 1) };
           return;
         }
@@ -109,16 +111,16 @@ pub extern fn key_update(state: *mut State) {
 #[no_mangle]
 pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   unsafe {
-    KEYROW = row;
-    KEYCOL = col;
+    (*state).keyrow = row;
+    (*state).keycol = col;
   }
   key_update(state);
 }
 
 #[no_mangle]
-pub extern fn key_is_down(_state: *mut State) -> bool {
-  let keyrow = unsafe { KEYROW };
-  let keycol = unsafe { KEYCOL };
+pub extern fn key_is_down(state: *mut State) -> bool {
+  let keyrow = unsafe { (*state).keyrow };
+  let keycol = unsafe { (*state).keycol };
   assert!(keyrow < 8);
   assert!(keycol < 10);
   if keyrow == 0 && keycol >= 2 && keycol <= 9 {
