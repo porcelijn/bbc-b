@@ -79,28 +79,14 @@ typedef struct state_t {
   int interrupt;
 
   int keyrow, keycol;
+
+  // keep this as last item
+  int keypress_filler[16]; // not sure what Rust Box<FnMut> looks like
 } state_t;
 
 int get_interrupt(state_t const * const s)
 {
   return s->interrupt;
-}
-
-state_t* new_state()
-{
-  state_t* s = (state_t*) malloc(sizeof(state_t));
-  s->IC32 = 0;
-  s->sdbval = 0;
-  s->sysvia_sdb_out = 0;
-  s->scrsize = 0;
-  s->via = (VIA*) 0;
-  s->interrupt = 0;
-  return s;
-}
-
-void free_state(state_t * s)
-{
-  free(s);
 }
 
 /*Calculate current state of slow data bus

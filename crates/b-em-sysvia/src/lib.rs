@@ -1,18 +1,16 @@
 // a quasi object shim that delegates to C implementation singleton
 pub struct Sysvia {
   via: *mut Cvia,
-  state: *mut State,
+  state: *mut State, // Pointer owns state, must drop in Rust land!
 }
 
 pub type Keypress = dyn FnMut() -> (u8, bool);
 
 impl Sysvia {
   pub fn new(callback: Box<Keypress>) -> Self {
-    let state = unsafe { new_state() };
+    let state = Box::new(State::new(callback));
+    let state = Box::into_raw(state);
     let via = unsafe { sysvia_new(state) };
-    unsafe {
-      set_singleton(callback); // TODO: remove, this is bullshit
-    }
     Sysvia{ via, state }
   }
 
@@ -34,8 +32,12 @@ impl Sysvia {
 
 impl Drop for Sysvia {
   fn drop(&mut self) {
+    // Call C cleanup
     unsafe { sysvia_delete(self.via) };
-    unsafe { free_state(self.state) };
+
+    // Sysvia owns state, must drop explicitly
+    let state = unsafe { Box::from_raw(self.state) }; // take back ownership
+    drop(state);
   }
 }
 
@@ -56,15 +58,22 @@ pub struct State {
   interrupt: u32,
   keyrow: u32,
   keycol: u32,
+
+  keypress: Box<Keypress>,
+}
+
+impl State {
+  fn new(keypress: Box<Keypress>) -> Self {
+    State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
+            via: std::ptr::null_mut(), interrupt: 0, keyrow: 0, keycol: 0,
+            keypress }
+  }
 }
 
 #[repr(C)]
 struct Cvia([u8; 0]); // opaque
 
 extern {
-  fn new_state() -> *mut State;
-  fn free_state(state: *mut State);
-//fn get_interrupt(state: *const State) -> u32;
   fn sysvia_new(state: *mut State) -> *mut Cvia;
   fn sysvia_delete(via: *mut Cvia);
   fn sysvia_read(via: *mut Cvia, address: u16) -> u8;
@@ -175,24 +184,11 @@ pub extern fn led_update(led_name: u32 /* led_name_t */, b: bool, ticks: u32) {
   println!("LED update: led_name={led_name}, b={b}, ticks={ticks}");
 }
 
-static mut CALLBACK: Option<Box<Keypress>> = None;
-unsafe fn set_singleton(callback: Box<Keypress>) {
-  assert!(CALLBACK.is_none());
-  CALLBACK = Some(callback);
-}
-
 #[no_mangle]
-pub extern fn key_paste_poll(_state: *mut State) {
+pub extern fn key_paste_poll(state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
-  #[allow(static_mut_refs)] // FIXME
-  let callback: &mut Option<Box<Keypress>> = unsafe { &mut CALLBACK };
-  let callback: &mut Box<Keypress> = if let Some(callback) = callback {
-    callback
-  } else {
-    unreachable!();
-  };
-
+  let callback: &mut Box<Keypress> = unsafe { &mut (*state).keypress };
   let (key_code, pressed) = callback();
   let row = (key_code & 0b0111_0000) >> 4;
   let col = (key_code & 0b0000_1111) >> 0;
@@ -203,7 +199,8 @@ pub extern fn key_paste_poll(_state: *mut State) {
 
 #[allow(unused)]
 unsafe fn characterization_test() {
-  let s = new_state();
+  let s = State::new(Box::new(|| (0x69, false)));
+  let s = Box::into_raw(Box::new(s));
   let via = sysvia_new(s);
   let v = sysvia_read(via, 0);
   assert_eq!(v, 0xFF); 
@@ -212,7 +209,7 @@ unsafe fn characterization_test() {
 
   assert_eq!((*s).interrupt, 0);
   sysvia_delete(via);
-  free_state(s);
+  drop(Box::from_raw(s));
 }
 
 #[test]
@@ -220,10 +217,11 @@ fn test() {
   // do stuff
   unsafe { characterization_test() };
 
-  let sysvia = Sysvia::new(Box::new(|| (123, true)));
+  let sysvia = Sysvia::new(Box::new(|| (0x42, true)));
   let v = sysvia.read(0);
   assert_eq!(v, 0xFF); // via_read_null()
   sysvia.write(0, 1);
+  sysvia.step(100);
 
 //assert_eq!(unsafe { interrupt }, 0);
 }
