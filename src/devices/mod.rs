@@ -11,7 +11,7 @@ use keyboard::Keyboard;
 use crate::memory::{Address, MemoryBus};
 use crate::mc6845::CRTC;
 use crate::mos6522::{UserVIA, UserPortA, UserPortB};
-//use crate::mos6522::alt_via::AltVIA;
+use crate::mos6522::alt_via::AltVIA;
 use crate::mos6522::system_via::{SystemVIA, SystemPortA, SystemPortB};
 
 #[derive(Debug)]
@@ -92,7 +92,7 @@ pub trait DevicePage<const PAGE: u8> : MemoryBus {
 pub struct SheilaPage {
   crtc: Rc<RefCell<CRTC>>,
   acia: RefCell<ACIA>,
-//alt_sysvia: Rc<RefCell<AltVIA>>,
+  alt_sysvia: Rc<RefCell<AltVIA>>,
   system_via: Rc<RefCell<SystemVIA>>,
   user_via: RefCell<UserVIA>,
   device_todo: RefCell<UnimplementedDevice>,
@@ -108,7 +108,7 @@ impl SheilaPage {
     let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
     let crtc = Rc::new(RefCell::new(crtc));
-//  let alt_sysvia = Rc::new(RefCell::new(AltVIA::new()));
+    let alt_sysvia = Rc::new(RefCell::new(AltVIA::new()));
     let system_port_b = SystemPortB::new(ic32);
     let system_via = SystemVIA::new(system_port_a, system_port_b);
     let irq = system_via.irq.clone();
@@ -118,7 +118,7 @@ impl SheilaPage {
     let user_via = RefCell::new(user_via);
     let device_todo = RefCell::new(UnimplementedDevice{}); // catch all
     SheilaPage { crtc, acia,
-                 /* alt_sysvia, */ system_via, user_via,
+                 alt_sysvia, system_via, user_via,
                  device_todo, irq, use_alt_system_via: false,
     }
   }
@@ -126,7 +126,7 @@ impl SheilaPage {
   pub fn get_clocked_devices(&self) -> ClockedDevices {
     let mut devices = ClockedDevices::new();
     devices.push(self.crtc.clone());
-//  devices.push(self.alt_sysvia.clone());
+    devices.push(self.alt_sysvia.clone());
     devices.push(self.system_via.clone());
     devices
   }
@@ -143,8 +143,7 @@ impl SheilaPage {
       },
       //...
       0x40 | 0x50 => if self.use_alt_system_via {
-//      &*self.alt_sysvia
-        &self.device_todo
+        &*self.alt_sysvia
       } else {
         &*self.system_via
       },
