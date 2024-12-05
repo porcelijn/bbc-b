@@ -185,14 +185,19 @@ unsafe fn set_singleton(callback: Box<Keypress>) {
 pub extern fn key_paste_poll(_state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
+  #[allow(static_mut_refs)] // FIXME
+  let callback: &mut Option<Box<Keypress>> = unsafe { &mut CALLBACK };
+  let callback: &mut Box<Keypress> = if let Some(callback) = callback {
+    callback
+  } else {
+    unreachable!();
+  };
+
+  let (key_code, pressed) = callback();
+  let row = (key_code & 0b0111_0000) >> 4;
+  let col = (key_code & 0b0000_1111) >> 0;
   unsafe {
-    #[allow(static_mut_refs)] // FIXME
-    if let Some(callback) = &mut CALLBACK {
-      let (key_code, pressed) = callback();
-      let row = (key_code & 0b0111_0000) >> 4;
-      let col = (key_code & 0b0000_1111) >> 0;
-      BBCMATRIX[col as usize][row as usize] = pressed;
-    }
+    BBCMATRIX[col as usize][row as usize] = pressed;
   }
 }
 
