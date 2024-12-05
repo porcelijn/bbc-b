@@ -56,6 +56,11 @@ pub struct State {
   via: *mut Cvia,
 //int kbdips;
   interrupt: u32,
+  keyboard: Keyboard
+}
+
+#[repr(C)]
+struct Keyboard {
   keyrow: u32,
   keycol: u32,
 
@@ -64,9 +69,9 @@ pub struct State {
 
 impl State {
   fn new(keypress: Box<Keypress>) -> Self {
+    let keyboard = Keyboard { keyrow: 0, keycol: 0, keypress };
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
-            via: std::ptr::null_mut(), interrupt: 0, keyrow: 0, keycol: 0,
-            keypress }
+            via: std::ptr::null_mut(), interrupt: 0, keyboard }
   }
 }
 
@@ -88,8 +93,7 @@ extern {
 //static mut IC32: u32 = 0;
 static mut BBCMATRIX: [[bool; 8]; 10] = [[false; 8]; 10];
 
-#[no_mangle]
-pub extern fn key_update(state: *mut State) {
+fn key_update(state: *mut State) {
   let maxcol = 10;
   let cvia = unsafe { (*state).via };
   if unsafe { (*state).ic32 & 8 } != 0 {
@@ -105,9 +109,10 @@ pub extern fn key_update(state: *mut State) {
   }
   else {
     /* scan specific key mode */
-    if unsafe { (*state).keycol } < maxcol {
+    let keycol = unsafe { (*state).keyboard.keycol };
+    if keycol < maxcol {
       for row in 1..8 {
-        if unsafe { BBCMATRIX[(*state).keycol as usize][row as usize] } {
+        if unsafe { BBCMATRIX[keycol as usize][row as usize] } {
           unsafe { sysvia_set_ca2(cvia, 1) };
           return;
         }
@@ -119,17 +124,17 @@ pub extern fn key_update(state: *mut State) {
 
 #[no_mangle]
 pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
-  unsafe {
-    (*state).keyrow = row;
-    (*state).keycol = col;
-  }
+  let keyboard = unsafe { &mut (*state).keyboard };
+  keyboard.keyrow = row;
+  keyboard.keycol = col;
   key_update(state);
 }
 
 #[no_mangle]
 pub extern fn key_is_down(state: *mut State) -> bool {
-  let keyrow = unsafe { (*state).keyrow };
-  let keycol = unsafe { (*state).keycol };
+  let keyboard = unsafe { &mut (*state).keyboard };
+  let keyrow = keyboard.keyrow;
+  let keycol = keyboard.keycol;
   assert!(keyrow < 8);
   assert!(keycol < 10);
   if keyrow == 0 && keycol >= 2 && keycol <= 9 {
@@ -181,14 +186,15 @@ pub extern fn sn_write(data: u8) {
 
 #[no_mangle]
 pub extern fn led_update(led_name: u32 /* led_name_t */, b: bool, ticks: u32) {
-  println!("LED update: led_name={led_name}, b={b}, ticks={ticks}");
+ println!("LED update: led_name={led_name}, b={b}, ticks={ticks}");
 }
 
 #[no_mangle]
 pub extern fn key_paste_poll(state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
-  let callback: &mut Box<Keypress> = unsafe { &mut (*state).keypress };
+  let keyboard = unsafe { &mut (*state).keyboard };
+  let callback: &mut Box<Keypress> = &mut keyboard.keypress;
   let (key_code, pressed) = callback();
   let row = (key_code & 0b0111_0000) >> 4;
   let col = (key_code & 0b0000_1111) >> 0;
