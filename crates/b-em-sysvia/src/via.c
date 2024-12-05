@@ -2,8 +2,6 @@
 #include <stdbool.h>
 //#include "b-em.h"
 //#include "6502.h"
-// Stub:
-bool interrupt;
 
 #include "via.h"
 
@@ -35,17 +33,18 @@ bool interrupt;
 
 #define TLIMIT -3
 
+
 static void via_updateIFR(VIA *v)
 {
         if ((v->ifr & 0x7F) & (v->ier & 0x7F))
         {
                 v->ifr |= 0x80;
-                interrupt |= v->intnum;
+                *v->interrupt |= v->intnum;
         }
         else
         {
                 v->ifr &= ~0x80;
-                interrupt &= ~v->intnum;
+                *v->interrupt &= ~v->intnum;
         }
 }
 
@@ -206,7 +205,7 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 if ((v->t2c == TLIMIT && (v->ier & INT_TIMER2)) ||
                     (v->ifr & v->ier & INT_TIMER2))
                 {
-                        interrupt |= 128;
+                        *v->interrupt |= 128;
                 }
                 v->t2l &= 0x1FE;
                 v->t2l |= (val << 9);

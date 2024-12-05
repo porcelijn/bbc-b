@@ -30,6 +30,8 @@ typedef struct VIA
         void     (*set_cb1)(port_t port, int level);
         void     (*set_cb2)(port_t port, int level);
         void     (*timer_expire1)();
+
+        int      *interrupt;
 } VIA;
 
 uint8_t via_read(VIA *v, uint16_t addr);

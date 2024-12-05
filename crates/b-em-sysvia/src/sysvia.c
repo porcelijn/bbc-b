@@ -73,13 +73,26 @@ typedef struct state_t {
 
   int scrsize;
 //int kbdips;
+  VIA* via;
+  int interrupt;
 } state_t;
 
-state_t* reset_state()
+int get_interrupt(state_t const * const s)
+{
+  return s->interrupt;
+}
+
+state_t* new_state()
 {
   state_t* s = (state_t*) malloc(sizeof(state_t));
   s->IC32 = 0;
+  s->via = (VIA*) 0;
   return s;
+}
+
+void free_state(state_t * s)
+{
+  free(s);
 }
 
 /*Calculate current state of slow data bus
@@ -185,6 +198,7 @@ void sysvia_reset(state_t* state)
         via_reset(&sysvia);
 
         sysvia.port_a = sysvia.port_b = state;
+        sysvia.interrupt = &state->interrupt;
 
         sysvia.read_portA = sysvia_read_portA;
         sysvia.read_portB = sysvia_read_portB;

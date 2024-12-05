@@ -1,15 +1,18 @@
 // a quasi object shim that delegates to C implementation singleton
-pub struct Sysvia;
+pub struct Sysvia {
+  state: *mut State,
+}
 
 pub type Keypress = dyn FnMut() -> (u8, bool);
 
 impl Sysvia {
   pub fn new(callback: Box<Keypress>) -> Self {
+    let state = unsafe { new_state() };
     unsafe {
       set_singleton(callback);
-      sysvia_reset();
+      sysvia_reset(state);
     }
-    Sysvia
+    Sysvia{ state }
   }
 
   pub fn read(&self, address: u16) -> u8 {
@@ -28,9 +31,20 @@ impl Sysvia {
   }
 }
 
+impl Drop for Sysvia {
+  fn drop(&mut self) {
+    unsafe { free_state(self.state) };
+  }
+}
+
+#[repr(C)]
+struct State([u8; 0]); // opaque
+
 extern {
-  static mut interrupt: u32;
-  fn sysvia_reset();
+  fn new_state() -> *mut State;
+  fn free_state(state: *mut State);
+  fn get_interrupt(state: *const State) -> u32;
+  fn sysvia_reset(state: *mut State);
   fn sysvia_read(address: u16) -> u8;
   fn sysvia_write(address: u16, value: u8);
   fn sysvia_set_ca2(level: u32);
@@ -156,12 +170,14 @@ pub extern fn key_paste_poll() {
 
 #[allow(unused)]
 unsafe fn characterization_test() {
-  sysvia_reset();
+  let s = new_state();
+  sysvia_reset(s);
   let v = sysvia_read(0);
   assert_eq!(v, 0xFF); 
   sysvia_write(0, 1);
 
-  assert_eq!(interrupt, 0);
+  assert_eq!(get_interrupt(s), 0);
+  free_state(s);
 }
 
 #[test]
@@ -169,11 +185,11 @@ fn test() {
   // do stuff
   unsafe { characterization_test() };
 
-  unsafe { sysvia_reset() };
-  let v = unsafe { sysvia_read(0) };
-  assert_eq!(v, 0xFF); 
-  unsafe { sysvia_write(0, 1) };
+  let sysvia = Sysvia::new(Box::new(|| (123, true)));
+  let v = sysvia.read(0);
+  assert_eq!(v, 0xFF); // via_read_null()
+  sysvia.write(0, 1);
 
-  assert_eq!(unsafe { interrupt }, 0);
+//assert_eq!(unsafe { interrupt }, 0);
 }
 
