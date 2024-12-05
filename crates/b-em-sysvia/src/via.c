@@ -90,19 +90,19 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 if ((v->pcr & 0x0E) == 0x08) /*Handshake mode*/
                 {
-                        v->set_ca2(0);
+                        v->set_ca2(v->port_a, 0);
                         v->ca2 = 0;
                 }
                 if ((v->pcr & 0x0E) == 0x0A) /*Pulse mode*/
                 {
-                        v->set_ca2(0);
-                        v->set_ca2(1);
+                        v->set_ca2(v->port_a, 0);
+                        v->set_ca2(v->port_a, 1);
                         v->ca2 = 1;
                 }
                 // FALLTHROUGH
 
             case ORAnh:
-                v->write_portA((val & v->ddra) | ~v->ddra);
+                v->write_portA(v->port_a, (val & v->ddra) | ~v->ddra);
                 v->ora=val;
                 break;
 
@@ -116,31 +116,31 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
                 val = (val & v->ddrb) | ~v->ddrb;
                 if (v->acr & 0x80)
                     val = (val & 0x8f) | v->t1pb7;
-                v->write_portB(val);
+                v->write_portB(v->port_b, val);
 
                 if ((v->pcr & 0xE0) == 0x80) /*Handshake mode*/
                 {
-                        v->set_cb2(0);
+                        v->set_cb2(v->port_b, 0);
                         v->cb2 = 0;
                 }
                 if ((v->pcr & 0xE0) == 0xA0) /*Pulse mode*/
                 {
-                        v->set_cb2(0);
-                        v->set_cb2(1);
+                        v->set_cb2(v->port_b, 0);
+                        v->set_cb2(v->port_b, 1);
                         v->cb2 = 1;
                 }
                 break;
 
             case DDRA:
                 v->ddra = val;
-                v->write_portA((v->ora & v->ddra) | ~v->ddra);
+                v->write_portA(v->port_a, (v->ora & v->ddra) | ~v->ddra);
                 break;
             case DDRB:
                 v->ddrb = val;
                 val = (v->orb & val) | ~val; // val is now output data.
                 if (v->acr & 0x80)
                     val = (val & 0x8f) | v->t1pb7;
-                v->write_portB(val);
+                v->write_portB(v->port_b, val);
                 break;
             case ACR:
                 v->acr  = val;
@@ -151,23 +151,23 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 if ((val & 0xE) == 0xC)
                 {
-                        v->set_ca2(0);
+                        v->set_ca2(v->port_a, 0);
                         v->ca2 = 0;
                 }
                 else if (val & 0x8)
                 {
-                        v->set_ca2(1);
+                        v->set_ca2(v->port_a, 1);
                         v->ca2 = 1;
                 }
 
                 if ((val & 0xE0) == 0xC0)
                 {
-                        v->set_cb2(0);
+                        v->set_cb2(v->port_b, 0);
                         v->cb2 = 0;
                 }
                 else if (val & 0x80)
                 {
-                        v->set_cb2(1);
+                        v->set_cb2(v->port_b, 1);
                         v->cb2 = 1;
                 }
                 break;
@@ -245,7 +245,7 @@ uint8_t via_read(VIA *v, uint16_t addr)
                 if (v->acr & 1)
                    temp|=(v->ira          & ~v->ddra); /*Read latch*/
                 else
-                   temp|=(v->read_portA() & ~v->ddra); /*Read current port values*/
+                   temp|=(v->read_portA(v->port_a) & ~v->ddra); /*Read current port values*/
                 return temp;
 
             case ORB:
@@ -258,7 +258,7 @@ uint8_t via_read(VIA *v, uint16_t addr)
                 if (v->acr & 2)
                    temp|=(v->irb          & ~v->ddrb); /*Read latch*/
                 else { /*Read current port values*/
-                    temp |= v->read_portB() & ~v->ddrb;
+                    temp |= v->read_portB(v->port_b) & ~v->ddrb;
                     if (v->acr & 0x80)
                         temp = (temp & 0x7f) | v->t1pb7;
                 }
@@ -318,13 +318,13 @@ void via_set_ca1(VIA *v, int level)
         if (level == v->ca1) return;
         if (((v->pcr & 0x01) && level) || (!(v->pcr & 0x01) && !level))
         {
-                if (v->acr & 0x01) v->ira = v->read_portA(); /*Latch port A*/
+                if (v->acr & 0x01) v->ira = v->read_portA(v->port_a); /*Latch port A*/
                 v->ifr |= INT_CA1;
                 via_updateIFR(v);
                 if ((v->pcr & 0x0C) == 0x08) /*Handshaking mode*/
                 {
                         v->ca2 = 1;
-                        v->set_ca2(1);
+                        v->set_ca2(v->port_a, 1);
                 }
         }
         v->ca1 = level;
@@ -348,7 +348,7 @@ void via_set_cb1(VIA *v, int level)
         if (((v->pcr & 0x10) && level) || (!(v->pcr & 0x10) && !level))
         {
                 if (v->acr & 0x02) { /*Latch port B*/
-                    uint8_t data = v->read_portB() & ~v->ddrb;
+                    uint8_t data = v->read_portB(v->port_b) & ~v->ddrb;
                     if (v->acr & 0x80)
                         data = (data & 0x7f) | v->t1pb7;
                     v->irb = data;
@@ -358,7 +358,7 @@ void via_set_cb1(VIA *v, int level)
                 if ((v->pcr & 0xC0) == 0x80) /*Handshaking mode*/
                 {
                         v->cb2 = 1;
-                        v->set_cb2(1);
+                        v->set_cb2(v->port_b, 1);
                 }
         }
         v->cb1 = level;
@@ -384,10 +384,10 @@ void via_shift(VIA *v, int cycles) {
             if (v->sr_count > 0) {
                 cb1 = !(v->sr_count-- & 0x01);
                 if (cb1) {
-                    v->set_cb2(v->sr >> 7);
+                    v->set_cb2(v->port_b, v->sr >> 7);
                     v->sr = (v->sr << 1);
                 }
-                v->set_cb1(cb1);
+                v->set_cb1(v->port_b, cb1);
             }
             if (v->sr_count <= 0) {
                 v->ifr |= 0x04;
@@ -397,16 +397,16 @@ void via_shift(VIA *v, int cycles) {
     }
 }
 
-static uint8_t via_read_null()
+static uint8_t via_read_null(port_t)
 {
         return 0xFF;
 }
 
-static void via_write_null(uint8_t /* val */)
+static void via_write_null(port_t, uint8_t /* val */)
 {
 }
 
-static void via_set_null(int /* level */)
+static void via_set_null(port_t, int /* level */)
 {
 }
 

@@ -1,6 +1,8 @@
 #ifndef __INC_VIA_H
 #define __INC_VIA_H
 
+typedef void* port_t;
+
 typedef struct VIA
 {
         uint8_t  ora,   orb,   ira,   irb;
@@ -15,16 +17,19 @@ typedef struct VIA
         int      intnum;
         int      sr_count;
 
-        uint8_t  (*read_portA)(void);
-        uint8_t  (*read_portB)(void);
-        void     (*write_portA)(uint8_t val);
-        void     (*write_portB)(uint8_t val);
+        port_t   port_a;
+        port_t   port_b;
 
-        void     (*set_ca1)(int level);
-        void     (*set_ca2)(int level);
-        void     (*set_cb1)(int level);
-        void     (*set_cb2)(int level);
-        void     (*timer_expire1)(void);
+        uint8_t  (*read_portA)(port_t port);
+        uint8_t  (*read_portB)(port_t port);
+        void     (*write_portA)(port_t port, uint8_t val);
+        void     (*write_portB)(port_t port, uint8_t val);
+
+        void     (*set_ca1)(port_t port, int level);
+        void     (*set_ca2)(port_t port, int level);
+        void     (*set_cb1)(port_t port, int level);
+        void     (*set_cb2)(port_t port, int level);
+        void     (*timer_expire1)();
 } VIA;
 
 uint8_t via_read(VIA *v, uint16_t addr);
