@@ -7,7 +7,7 @@ typedef void* port_t;
 typedef struct state_t state_t;
 
 VIA*    sysvia_new(state_t * s);
-void    sysvia_delete(VIA*); 
+void    sysvia_delete(VIA*);
 void    sysvia_write(VIA*, uint16_t addr, uint8_t val);
 uint8_t sysvia_read(VIA*, uint16_t addr);
 //void    sysvia_savestate(FILE *f);

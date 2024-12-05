@@ -28,6 +28,11 @@ impl Sysvia {
   pub fn step(&self, ticks: u32) {
     unsafe { sysvia_poll(self.via, ticks) };
   }
+
+  pub fn has_irq(&self) -> bool {
+    let state = unsafe { &*(self.state) };
+    state.interrupt != 0
+  }
 }
 
 impl Drop for Sysvia {
@@ -168,17 +173,17 @@ pub extern fn key_is_down(state: *const State) -> bool {
 /*
 #[repr(C)]
 struct VIA {
-  ora: u8, orb: u8, ira: u8, irb: u8, 
-  ddra: u8, ddrb: u8, 
-  sr: u8, 
-  t1pb7: u8, 
-  t1l: u32, t2l:  u32, 
-  t1c: u32, t2c:  u32, 
-  acr: u8, pcr: u8, ifr: u8, ier: u8, 
-  t1hit: u32, t2hit:  u32, 
-  ca1: u32, ca2: u32, cb1: u32, cb2: u32, 
-  intnum: u32, 
-  sr_count: u32, 
+  ora: u8, orb: u8, ira: u8, irb: u8,
+  ddra: u8, ddrb: u8,
+  sr: u8,
+  t1pb7: u8,
+  t1l: u32, t2l:  u32,
+  t1c: u32, t2c:  u32,
+  acr: u8, pcr: u8, ifr: u8, ier: u8,
+  t1hit: u32, t2hit:  u32,
+  ca1: u32, ca2: u32, cb1: u32, cb2: u32,
+  intnum: u32,
+  sr_count: u32,
   uint8_t  (*read_portA)(void);
   uint8_t  (*read_portB)(void);
   void     (*write_portA)(uint8_t val);
@@ -221,7 +226,7 @@ unsafe fn characterization_test() {
   let s = Box::into_raw(Box::new(s));
   let via = sysvia_new(s);
   let v = sysvia_read(via, 0);
-  assert_eq!(v, 0xFF); 
+  assert_eq!(v, 0xFF);
   sysvia_write(via, 0, 1);
   sysvia_poll(via, 1);
 
@@ -235,12 +240,32 @@ fn test() {
   // do stuff
   unsafe { characterization_test() };
 
-  let sysvia = Sysvia::new(Box::new(|| (0x42, true)));
+  let mut seed = 3 * 0x10;
+  let input = move || -> (u8, bool) {
+    let pressed = seed % 3 == 1;
+    let key_code = (seed / 3) & 0b0111_0111;
+    seed += 1;
+    (key_code, pressed)
+  };
+
+  let sysvia = Sysvia::new(Box::new(input));
   let v = sysvia.read(0);
   assert_eq!(v, 0xFF); // via_read_null()
   sysvia.write(0, 1);
   sysvia.step(100);
 
-//assert_eq!(unsafe { interrupt }, 0);
+  assert_eq!(sysvia.has_irq(), false);
+  sysvia.write(14, 0xFF); // ier, enable all interrupts
+  sysvia.write(13, 0x7F); // ifr, clear all interrupts
+
+  assert_eq!(sysvia.has_irq(), false);
+  unsafe { // negative edge
+    sysvia_set_ca2(sysvia.via, 1);
+    sysvia_set_ca2(sysvia.via, 0);
+  }
+  assert_eq!(sysvia.has_irq(), true);
+
+  sysvia.write(13, 0x7F); // ifr, clear all interrupts
+  assert_eq!(sysvia.has_irq(), false);
 }
 

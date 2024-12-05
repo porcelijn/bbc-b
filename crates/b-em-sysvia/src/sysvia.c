@@ -84,11 +84,6 @@ typedef struct state_t {
   int keypress_filler[16]; // not sure what Rust Box<FnMut> looks like
 } state_t;
 
-int get_interrupt(state_t const * const s)
-{
-  return s->interrupt;
-}
-
 /*Calculate current state of slow data bus
   B-em emulates three bus masters - the System VIA itself, the keyboard (bit 7
   only) and the CMOS RAM (Master 128 only)*/
