@@ -54,7 +54,6 @@ pub struct State {
   scrsize: u32,
 
   via: *mut Cvia,
-//int kbdips;
   interrupt: u32,
   keyboard: Keyboard
 }
@@ -65,13 +64,60 @@ struct Keyboard {
   keycol: u32,
 
   keypress: Box<Keypress>,
+  kbdips: u8,
   bbcmatrix: [[bool; 8]; 10],
+}
+
+impl Keyboard {
+  const MAXCOL: u32 = 10;
+  fn scan_all(&self) -> bool {
+    for col in 0..Self::MAXCOL {
+      for row in 1..8 {
+        if self.bbcmatrix[col as usize][row as usize] {
+          return true;
+        }
+      }
+    }
+    false
+  }
+
+  fn scan_col(&self) -> bool {
+    if self.keycol < Self::MAXCOL {
+      for row in 1..8 {
+        if self.bbcmatrix[self.keycol as usize][row as usize] {
+          return true;
+        }
+      }
+    }
+    false
+  }
+
+  fn scan_key(&self) -> bool {
+    assert!(self.keyrow < 8 && self.keycol < Self::MAXCOL);
+    self.bbcmatrix[self.keycol as usize][self.keyrow as usize]
+  }
+
+  fn scan_dip(&self) -> bool {
+    assert!(2 <= self.keycol && self.keycol <= 9);
+    self.kbdips & (1 << (9 - self.keycol)) != 0
+  }
+
+  fn update_keys(&mut self) {
+    let (key_code, pressed) = (self.keypress)();
+    let row = (key_code & 0b0111_0000) >> 4;
+    let col = (key_code & 0b0000_1111) >> 0;
+    assert!(row < 8 && col < Self::MAXCOL as u8);
+    self.bbcmatrix[col as usize][row as usize] = pressed;
+  }
 }
 
 impl State {
   fn new(keypress: Box<Keypress>) -> Self {
     let bbcmatrix = [[false; 8]; 10];
-    let keyboard = Keyboard { keyrow: 0, keycol: 0, keypress, bbcmatrix };
+    let keyboard = Keyboard {
+      keyrow: 0, keycol: 0,
+      keypress, kbdips: 0b0000_0000, bbcmatrix,
+    };
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
             via: std::ptr::null_mut(), interrupt: 0, keyboard }
   }
@@ -89,62 +135,33 @@ extern {
   fn sysvia_poll(via: *mut Cvia, cycles: u32);
 }
 
-//static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
-//static mut KEYROW: u32 = 0;
-//static mut KEYCOL: u32 = 0;
-//static mut IC32: u32 = 0;
-//static mut BBCMATRIX: [[bool; 8]; 10] = [[false; 8]; 10];
-
-fn key_update(state: *mut State) {
+#[no_mangle]
+pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   let cvia = unsafe { (*state).via };
   let ic32 = unsafe { (*state).ic32 };
   let keyboard = unsafe { &mut (*state).keyboard };
-  let maxcol = 10;
-  if ic32 & 8 != 0 {
-    /* autoscan mode */
-    for col in 0..maxcol {
-      for row in 1..8 {
-        if keyboard.bbcmatrix[col as usize][row as usize] {
-          unsafe { sysvia_set_ca2(cvia, 1) };
-          return;
-        }
-      }
-    }
-  }
-  else {
-    /* scan specific key mode */
-    if keyboard.keycol < maxcol {
-      for row in 1..8 {
-        if keyboard.bbcmatrix[keyboard.keycol as usize][row as usize] {
-          unsafe { sysvia_set_ca2(cvia, 1) };
-          return;
-        }
-      }
-    }
-  }
-  unsafe { sysvia_set_ca2(cvia, 0); }
-}
 
-#[no_mangle]
-pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
-  let keyboard = unsafe { &mut (*state).keyboard };
   keyboard.keyrow = row;
   keyboard.keycol = col;
-  key_update(state);
+
+  let scan = if ic32 & 8 != 0 {
+    /* autoscan mode */
+    keyboard.scan_all()
+  } else {
+    /* scan specific key mode */
+    keyboard.scan_col()
+  };
+
+  unsafe { sysvia_set_ca2(cvia, scan as u32); }
 }
 
 #[no_mangle]
-pub extern fn key_is_down(state: *mut State) -> bool {
+pub extern fn key_is_down(state: *const State) -> bool {
   let keyboard = unsafe { &(*state).keyboard };
-  let keyrow = keyboard.keyrow;
-  let keycol = keyboard.keycol;
-  assert!(keyrow < 8);
-  assert!(keycol < 10);
-  if keyrow == 0 && keycol >= 2 && keycol <= 9 {
-    let kbdips = 0b0000_0000; // TODO, stub
-    return kbdips & (1 << (9 - keycol)) != 0;
+  if keyboard.keyrow == 0 && keyboard.keycol >= 2 && keyboard.keycol <= 9 {
+    keyboard.scan_dip()
   } else {
-    return keyboard.bbcmatrix[keycol as usize][keyrow as usize];
+    keyboard.scan_key()
   }
 }
 
@@ -195,11 +212,7 @@ pub extern fn key_paste_poll(state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
   let keyboard = unsafe { &mut (*state).keyboard };
-  let callback: &mut Box<Keypress> = &mut keyboard.keypress;
-  let (key_code, pressed) = callback();
-  let row = (key_code & 0b0111_0000) >> 4;
-  let col = (key_code & 0b0000_1111) >> 0;
-  keyboard.bbcmatrix[col as usize][row as usize] = pressed;
+  keyboard.update_keys();
 }
 
 #[allow(unused)]
