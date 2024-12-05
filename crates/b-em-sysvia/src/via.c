@@ -5,8 +5,6 @@
 
 #include "via.h"
 
-
-
 #define INT_CA1    0x02
 #define INT_CA2    0x01
 #define INT_CB1    0x10
@@ -89,13 +87,13 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 if ((v->pcr & 0x0E) == 0x08) /*Handshake mode*/
                 {
-                        v->set_ca2(v->port_a, 0);
+                        v->set_ca2(v, 0);
                         v->ca2 = 0;
                 }
                 if ((v->pcr & 0x0E) == 0x0A) /*Pulse mode*/
                 {
-                        v->set_ca2(v->port_a, 0);
-                        v->set_ca2(v->port_a, 1);
+                        v->set_ca2(v, 0);
+                        v->set_ca2(v, 1);
                         v->ca2 = 1;
                 }
                 // FALLTHROUGH
@@ -119,13 +117,13 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 if ((v->pcr & 0xE0) == 0x80) /*Handshake mode*/
                 {
-                        v->set_cb2(v->port_b, 0);
+                        v->set_cb2(v, 0);
                         v->cb2 = 0;
                 }
                 if ((v->pcr & 0xE0) == 0xA0) /*Pulse mode*/
                 {
-                        v->set_cb2(v->port_b, 0);
-                        v->set_cb2(v->port_b, 1);
+                        v->set_cb2(v, 0);
+                        v->set_cb2(v, 1);
                         v->cb2 = 1;
                 }
                 break;
@@ -150,23 +148,23 @@ void via_write(VIA *v, uint16_t addr, uint8_t val)
 
                 if ((val & 0xE) == 0xC)
                 {
-                        v->set_ca2(v->port_a, 0);
+                        v->set_ca2(v, 0);
                         v->ca2 = 0;
                 }
                 else if (val & 0x8)
                 {
-                        v->set_ca2(v->port_a, 1);
+                        v->set_ca2(v, 1);
                         v->ca2 = 1;
                 }
 
                 if ((val & 0xE0) == 0xC0)
                 {
-                        v->set_cb2(v->port_b, 0);
+                        v->set_cb2(v, 0);
                         v->cb2 = 0;
                 }
                 else if (val & 0x80)
                 {
-                        v->set_cb2(v->port_b, 1);
+                        v->set_cb2(v, 1);
                         v->cb2 = 1;
                 }
                 break;
@@ -323,7 +321,7 @@ void via_set_ca1(VIA *v, int level)
                 if ((v->pcr & 0x0C) == 0x08) /*Handshaking mode*/
                 {
                         v->ca2 = 1;
-                        v->set_ca2(v->port_a, 1);
+                        v->set_ca2(v, 1);
                 }
         }
         v->ca1 = level;
@@ -357,7 +355,7 @@ void via_set_cb1(VIA *v, int level)
                 if ((v->pcr & 0xC0) == 0x80) /*Handshaking mode*/
                 {
                         v->cb2 = 1;
-                        v->set_cb2(v->port_b, 1);
+                        v->set_cb2(v, 1);
                 }
         }
         v->cb1 = level;
@@ -383,10 +381,10 @@ void via_shift(VIA *v, int cycles) {
             if (v->sr_count > 0) {
                 cb1 = !(v->sr_count-- & 0x01);
                 if (cb1) {
-                    v->set_cb2(v->port_b, v->sr >> 7);
+                    v->set_cb2(v, v->sr >> 7);
                     v->sr = (v->sr << 1);
                 }
-                v->set_cb1(v->port_b, cb1);
+                v->set_cb1(v, cb1);
             }
             if (v->sr_count <= 0) {
                 v->ifr |= 0x04;
@@ -405,7 +403,7 @@ static void via_write_null(port_t, uint8_t /* val */)
 {
 }
 
-static void via_set_null(port_t, int /* level */)
+static void via_set_null(VIA*, int /* level */)
 {
 }
 

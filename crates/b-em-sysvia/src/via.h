@@ -3,6 +3,7 @@
 
 typedef void* port_t;
 
+typedef struct VIA VIA;
 typedef struct VIA
 {
         uint8_t  ora,   orb,   ira,   irb;
@@ -25,10 +26,10 @@ typedef struct VIA
         void     (*write_portA)(port_t port, uint8_t val);
         void     (*write_portB)(port_t port, uint8_t val);
 
-        void     (*set_ca1)(port_t port, int level);
-        void     (*set_ca2)(port_t port, int level);
-        void     (*set_cb1)(port_t port, int level);
-        void     (*set_cb2)(port_t port, int level);
+        void     (*set_ca1)(VIA* sysvia, int level);
+        void     (*set_ca2)(VIA* sysvia, int level);
+        void     (*set_cb1)(VIA* sysvia, int level);
+        void     (*set_cb2)(VIA* sysvia, int level);
         void     (*timer_expire1)();
 
         int      *interrupt;

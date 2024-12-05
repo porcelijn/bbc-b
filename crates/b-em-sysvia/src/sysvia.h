@@ -17,9 +17,9 @@ uint8_t sysvia_read(uint16_t addr);
 //extern uint8_t sdbval;
 //extern int scrsize;
 
-void sysvia_set_ca1(port_t portA, int level);
-void sysvia_set_ca2(port_t portA, int level);
-void sysvia_set_cb1(port_t portB, int level);
-void sysvia_set_cb2(port_t portB, int level);
+void sysvia_set_ca1(VIA* sysvia, int level);
+void sysvia_set_ca2(VIA* sysvia, int level);
+void sysvia_set_cb1(VIA* sysvia, int level);
+void sysvia_set_cb2(VIA* sysvia, int level);
 
 #endif

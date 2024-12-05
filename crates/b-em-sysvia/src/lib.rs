@@ -40,14 +40,18 @@ impl Drop for Sysvia {
 #[repr(C)]
 struct State([u8; 0]); // opaque
 
+#[repr(C)]
+struct Cvia([u8; 0]); // opaque
+
 extern {
   fn new_state() -> *mut State;
   fn free_state(state: *mut State);
+  fn get_sysvia() -> *mut Cvia;
   fn get_interrupt(state: *const State) -> u32;
   fn sysvia_reset(state: *mut State);
   fn sysvia_read(address: u16) -> u8;
   fn sysvia_write(address: u16, value: u8);
-  fn sysvia_set_ca2(level: u32);
+  fn sysvia_set_ca2(via: *mut Cvia, level: u32);
   fn sysvia_poll(cycles: u32);
 }
 
@@ -64,7 +68,8 @@ pub extern fn key_update() {
     for col in 0..maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[col as usize][row as usize] } {
-          unsafe { sysvia_set_ca2(1) };
+          let via = unsafe { get_sysvia() };
+          unsafe { sysvia_set_ca2(via, 1) };
           return;
         }
       }
@@ -75,13 +80,15 @@ pub extern fn key_update() {
     if unsafe { KEYCOL } < maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[KEYCOL as usize][row as usize] } {
-          unsafe { sysvia_set_ca2(1) };
+          let via = unsafe { get_sysvia() };
+          unsafe { sysvia_set_ca2(via, 1) };
           return;
         }
       }
     }
   }
-  unsafe { sysvia_set_ca2(0); }
+  let via = unsafe { get_sysvia() };
+  unsafe { sysvia_set_ca2(via, 0); }
 }
 
 #[no_mangle]

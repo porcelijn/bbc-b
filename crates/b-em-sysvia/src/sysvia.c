@@ -22,27 +22,33 @@ VIA sysvia;
 #define KB_CAPSLOCK_FLAG 0x0400
 #define KB_SCROLOCK_FLAG 0x0100
 
-void sysvia_set_ca1(port_t, int level)
+// TODO: remove
+VIA* get_sysvia()
 {
-        via_set_ca1(&sysvia,level);
-}
-void sysvia_set_ca2(port_t, int level)
-{
-//      if (OS01) level = !level; /*OS 0.1 programs CA2 to interrupt on negative edge and expects the keyboard to still work*/
-        via_set_ca2(&sysvia,level);
-}
-void sysvia_set_cb1(port_t, int level)
-{
-        via_set_cb1(&sysvia,level);
-}
-void sysvia_set_cb2(port_t, int level)
-{
-        via_set_cb2(&sysvia,level);
+  return &sysvia;
 }
 
-void sysvia_via_set_cb2(port_t, int level)
+void sysvia_set_ca1(VIA* sysvia, int level)
 {
-        if (level && !sysvia.cb2) /*Low -> high*/
+        via_set_ca1(sysvia,level);
+}
+void sysvia_set_ca2(VIA* sysvia, int level)
+{
+//      if (OS01) level = !level; /*OS 0.1 programs CA2 to interrupt on negative edge and expects the keyboard to still work*/
+        via_set_ca2(sysvia,level);
+}
+void sysvia_set_cb1(VIA* sysvia, int level)
+{
+        via_set_cb1(sysvia,level);
+}
+void sysvia_set_cb2(VIA* sysvia, int level)
+{
+        via_set_cb2(sysvia,level);
+}
+
+void sysvia_via_set_cb2(VIA* sysvia, int level)
+{
+        if (level && !sysvia->cb2) /*Low -> high*/
            crtc_latchpen();
 }
 
