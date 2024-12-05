@@ -1,5 +1,6 @@
 // a quasi object shim that delegates to C implementation singleton
 pub struct Sysvia {
+  via: *mut Cvia,
   state: *mut State,
 }
 
@@ -8,31 +9,33 @@ pub type Keypress = dyn FnMut() -> (u8, bool);
 impl Sysvia {
   pub fn new(callback: Box<Keypress>) -> Self {
     let state = unsafe { new_state() };
+    let via = unsafe { sysvia_new(state) };
     unsafe {
-      set_singleton(callback);
-      sysvia_reset(state);
+      SYSVIA = via; // No, no no!!!
+      set_singleton(callback); // TODO: remove, this is bullshit
     }
-    Sysvia{ state }
+    Sysvia{ via, state }
   }
 
   pub fn read(&self, address: u16) -> u8 {
-    let value = unsafe { sysvia_read(address) };
+    let value = unsafe { sysvia_read(self.via, address) };
     println!("B-em read: {address:x} -> {value:#04x}");
     value
   }
 
   pub fn write(&self, address: u16, value: u8) {
     println!("B-em write: {address:x} <- {value:#04x}");
-    unsafe { sysvia_write(address, value) };
+    unsafe { sysvia_write(self.via, address, value) };
   }
 
   pub fn step(&self, ticks: u32) {
-    unsafe { sysvia_poll(ticks) };
+    unsafe { sysvia_poll(self.via, ticks) };
   }
 }
 
 impl Drop for Sysvia {
   fn drop(&mut self) {
+    unsafe { sysvia_delete(self.via) };
     unsafe { free_state(self.state) };
   }
 }
@@ -46,15 +49,16 @@ struct Cvia([u8; 0]); // opaque
 extern {
   fn new_state() -> *mut State;
   fn free_state(state: *mut State);
-  fn get_sysvia() -> *mut Cvia;
   fn get_interrupt(state: *const State) -> u32;
-  fn sysvia_reset(state: *mut State);
-  fn sysvia_read(address: u16) -> u8;
-  fn sysvia_write(address: u16, value: u8);
+  fn sysvia_new(state: *mut State) -> *mut Cvia;
+  fn sysvia_delete(via: *mut Cvia);
+  fn sysvia_read(via: *mut Cvia, address: u16) -> u8;
+  fn sysvia_write(via: *mut Cvia, address: u16, value: u8);
   fn sysvia_set_ca2(via: *mut Cvia, level: u32);
-  fn sysvia_poll(cycles: u32);
+  fn sysvia_poll(via: *mut Cvia, cycles: u32);
 }
 
+static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
 static mut KEYROW: u32 = 0;
 static mut KEYCOL: u32 = 0;
 static mut IC32: u32 = 0;
@@ -68,7 +72,7 @@ pub extern fn key_update() {
     for col in 0..maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[col as usize][row as usize] } {
-          let via = unsafe { get_sysvia() };
+          let via = unsafe { SYSVIA };
           unsafe { sysvia_set_ca2(via, 1) };
           return;
         }
@@ -80,14 +84,14 @@ pub extern fn key_update() {
     if unsafe { KEYCOL } < maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[KEYCOL as usize][row as usize] } {
-          let via = unsafe { get_sysvia() };
+          let via = unsafe { SYSVIA };
           unsafe { sysvia_set_ca2(via, 1) };
           return;
         }
       }
     }
   }
-  let via = unsafe { get_sysvia() };
+  let via = unsafe { SYSVIA };
   unsafe { sysvia_set_ca2(via, 0); }
 }
 
@@ -178,12 +182,15 @@ pub extern fn key_paste_poll() {
 #[allow(unused)]
 unsafe fn characterization_test() {
   let s = new_state();
-  sysvia_reset(s);
-  let v = sysvia_read(0);
+  let via = sysvia_new(s);
+  SYSVIA = via; // No, no no!!!
+  let v = sysvia_read(via, 0);
   assert_eq!(v, 0xFF); 
-  sysvia_write(0, 1);
+  sysvia_write(via, 0, 1);
+  sysvia_poll(via, 1);
 
   assert_eq!(get_interrupt(s), 0);
+  sysvia_delete(via);
   free_state(s);
 }
 

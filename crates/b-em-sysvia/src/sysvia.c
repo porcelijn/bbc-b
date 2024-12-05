@@ -17,16 +17,12 @@
 #include "sysvia.h"
 #include "sn76489.h"
 #include "video.h"
-VIA sysvia;
+
+// Don't use singleton / global, create one on the heap!
+//VIA sysvia;
 
 #define KB_CAPSLOCK_FLAG 0x0400
 #define KB_SCROLOCK_FLAG 0x0100
-
-// TODO: remove
-VIA* get_sysvia()
-{
-  return &sysvia;
-}
 
 void sysvia_set_ca1(VIA* sysvia, int level)
 {
@@ -186,36 +182,44 @@ uint8_t sysvia_read_portB(port_t /*port_b*/)
         return temp;
 }
 
-void sysvia_write(uint16_t addr, uint8_t val)
+void sysvia_write(VIA* sysvia, uint16_t addr, uint8_t val)
 {
 //      log_debug("SYSVIA write %04X %02X\n",addr,val);
-        via_write(&sysvia, addr, val);
+        via_write(sysvia, addr, val);
 }
 
-uint8_t sysvia_read(uint16_t addr)
+uint8_t sysvia_read(VIA* sysvia, uint16_t addr)
 {
-        uint8_t temp = via_read(&sysvia, addr);
+        uint8_t temp = via_read(sysvia, addr);
 //      log_debug("SYSVIA read  %04X %02X\n",addr,temp);
         return temp;
 }
 
-void sysvia_reset(state_t* state)
+VIA* sysvia_new(state_t* state)
 {
-        via_reset(&sysvia);
+        VIA* sysvia = (VIA*) malloc(sizeof(VIA));
+        via_reset(sysvia);
 
-        sysvia.port_a = sysvia.port_b = state;
-        sysvia.interrupt = &state->interrupt;
+        sysvia->port_a = state;
+        sysvia->port_b = state;
+        sysvia->interrupt = &state->interrupt;
 
-        sysvia.read_portA = sysvia_read_portA;
-        sysvia.read_portB = sysvia_read_portB;
+        sysvia->read_portA = sysvia_read_portA;
+        sysvia->read_portB = sysvia_read_portB;
 
-        sysvia.write_portA = sysvia_write_portA;
-        sysvia.write_portB = sysvia_write_portB;
+        sysvia->write_portA = sysvia_write_portA;
+        sysvia->write_portB = sysvia_write_portB;
 
-        sysvia.set_cb2 = sysvia_via_set_cb2; /*Lightpen*/
-        sysvia.timer_expire1 = key_paste_poll;
+        sysvia->set_cb2 = sysvia_via_set_cb2; /*Lightpen*/
+        sysvia->timer_expire1 = key_paste_poll;
 
-        sysvia.intnum = 1;
+        sysvia->intnum = 1;
+        return sysvia;
+}
+
+void sysvia_delete(VIA* via)
+{
+        free(via);
 }
 
 /*
@@ -235,7 +239,7 @@ void sysvia_loadstate(FILE *f)
 }
 */
 
-void sysvia_poll(int cycles)
+void sysvia_poll(VIA* sysvia, int cycles)
 {
-  via_poll(&sysvia, cycles);
+  via_poll(sysvia, cycles);
 }
