@@ -11,7 +11,6 @@ impl Sysvia {
     let state = unsafe { new_state() };
     let via = unsafe { sysvia_new(state) };
     unsafe {
-      SYSVIA = via; // No, no no!!!
       set_singleton(callback); // TODO: remove, this is bullshit
     }
     Sysvia{ via, state }
@@ -51,6 +50,7 @@ pub struct State {
   sysvia_sdb_out: u8,
 
   scrsize: u32,
+
   via: *mut Cvia,
 //int kbdips;
   interrupt: u32,
@@ -71,7 +71,7 @@ extern {
   fn sysvia_poll(via: *mut Cvia, cycles: u32);
 }
 
-static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
+//static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
 static mut KEYROW: u32 = 0;
 static mut KEYCOL: u32 = 0;
 //static mut IC32: u32 = 0;
@@ -80,13 +80,13 @@ static mut BBCMATRIX: [[bool; 8]; 10] = [[false; 8]; 10];
 #[no_mangle]
 pub extern fn key_update(state: *mut State) {
   let maxcol = 10;
+  let cvia = unsafe { (*state).via };
   if unsafe { (*state).ic32 & 8 } != 0 {
     /* autoscan mode */
     for col in 0..maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[col as usize][row as usize] } {
-          let via = unsafe { SYSVIA };
-          unsafe { sysvia_set_ca2(via, 1) };
+          unsafe { sysvia_set_ca2(cvia, 1) };
           return;
         }
       }
@@ -97,15 +97,13 @@ pub extern fn key_update(state: *mut State) {
     if unsafe { KEYCOL } < maxcol {
       for row in 1..8 {
         if unsafe { BBCMATRIX[KEYCOL as usize][row as usize] } {
-          let via = unsafe { SYSVIA };
-          unsafe { sysvia_set_ca2(via, 1) };
+          unsafe { sysvia_set_ca2(cvia, 1) };
           return;
         }
       }
     }
   }
-  let via = unsafe { SYSVIA };
-  unsafe { sysvia_set_ca2(via, 0); }
+  unsafe { sysvia_set_ca2(cvia, 0); }
 }
 
 #[no_mangle]
@@ -200,7 +198,6 @@ pub extern fn key_paste_poll(_state: *mut State) {
 unsafe fn characterization_test() {
   let s = new_state();
   let via = sysvia_new(s);
-  SYSVIA = via; // No, no no!!!
   let v = sysvia_read(via, 0);
   assert_eq!(v, 0xFF); 
   sysvia_write(via, 0, 1);
