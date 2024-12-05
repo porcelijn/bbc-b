@@ -30,7 +30,7 @@ typedef struct VIA
         void     (*set_ca2)(VIA* sysvia, int level);
         void     (*set_cb1)(VIA* sysvia, int level);
         void     (*set_cb2)(VIA* sysvia, int level);
-        void     (*timer_expire1)();
+        void     (*timer_expire1)(void *);
 
         int      *interrupt;
 } VIA;

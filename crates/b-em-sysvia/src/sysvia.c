@@ -88,7 +88,11 @@ state_t* new_state()
 {
   state_t* s = (state_t*) malloc(sizeof(state_t));
   s->IC32 = 0;
+  s->sdbval = 0;
+  s->sysvia_sdb_out = 0;
+  s->scrsize = 0;
   s->via = (VIA*) 0;
+  s->interrupt = 0;
   return s;
 }
 
@@ -105,8 +109,8 @@ static void sysvia_update_sdb(state_t* s)
         s->sdbval = s->sysvia_sdb_out;
 //      if (MASTER && !compactcmos) sdbval &= cmos_read();
 
-        key_scan((s->sdbval >> 4) & 7, s->sdbval & 0xF);
-        if (!(s->IC32 & 8) && !key_is_down())
+        key_scan(s, (s->sdbval >> 4) & 7, s->sdbval & 0xF);
+        if (!(s->IC32 & 8) && !key_is_down(s))
             s->sdbval &= 0x7f;
 }
 
@@ -200,6 +204,7 @@ VIA* sysvia_new(state_t* state)
         VIA* sysvia = (VIA*) malloc(sizeof(VIA));
         via_reset(sysvia);
 
+        state->via = sysvia; // circular!
         sysvia->port_a = state;
         sysvia->port_b = state;
         sysvia->interrupt = &state->interrupt;
@@ -217,9 +222,11 @@ VIA* sysvia_new(state_t* state)
         return sysvia;
 }
 
-void sysvia_delete(VIA* via)
+void sysvia_delete(VIA* sysvia)
 {
-        free(via);
+        state_t* state = (state_t*) sysvia->port_a; // HACKY!
+        state->via = (VIA*) 0; // break cycle
+        free(sysvia);
 }
 
 /*

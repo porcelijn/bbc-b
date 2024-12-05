@@ -56,7 +56,10 @@ void via_poll(VIA *v, int cycles)
             v->ifr |= INT_TIMER1;
             via_updateIFR(v);
             if (v->timer_expire1)
-                v->timer_expire1();
+            {
+                void* state = v->port_a; // Hacky!
+                v->timer_expire1(state);
+            }
             if (v->acr & 0x80) /*Output to PB7*/
                 v->t1pb7 ^= 0x80;
         }

@@ -41,7 +41,20 @@ impl Drop for Sysvia {
 }
 
 #[repr(C)]
-struct State([u8; 0]); // opaque
+pub struct State {
+  /*Current state of IC32 output*/
+  ic32: u8,
+  /*Current effective state of the slow data bus*/
+  sdbval: u8,
+  /*What the System VIA is actually outputting to the slow data bus
+    For use when contending with whatever else is outputting to the bus*/
+  sysvia_sdb_out: u8,
+
+  scrsize: u32,
+  via: *mut Cvia,
+//int kbdips;
+  interrupt: u32,
+}
 
 #[repr(C)]
 struct Cvia([u8; 0]); // opaque
@@ -49,7 +62,7 @@ struct Cvia([u8; 0]); // opaque
 extern {
   fn new_state() -> *mut State;
   fn free_state(state: *mut State);
-  fn get_interrupt(state: *const State) -> u32;
+//fn get_interrupt(state: *const State) -> u32;
   fn sysvia_new(state: *mut State) -> *mut Cvia;
   fn sysvia_delete(via: *mut Cvia);
   fn sysvia_read(via: *mut Cvia, address: u16) -> u8;
@@ -61,13 +74,13 @@ extern {
 static mut SYSVIA: *mut Cvia = std::ptr::null_mut();
 static mut KEYROW: u32 = 0;
 static mut KEYCOL: u32 = 0;
-static mut IC32: u32 = 0;
+//static mut IC32: u32 = 0;
 static mut BBCMATRIX: [[bool; 8]; 10] = [[false; 8]; 10];
 
 #[no_mangle]
-pub extern fn key_update() {
+pub extern fn key_update(state: *mut State) {
   let maxcol = 10;
-  if unsafe { IC32 & 8 } != 0 {
+  if unsafe { (*state).ic32 & 8 } != 0 {
     /* autoscan mode */
     for col in 0..maxcol {
       for row in 1..8 {
@@ -96,22 +109,26 @@ pub extern fn key_update() {
 }
 
 #[no_mangle]
-pub extern fn key_scan(row: u32, col: u32) {
+pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   unsafe {
     KEYROW = row;
     KEYCOL = col;
   }
-  key_update();
+  key_update(state);
 }
 
 #[no_mangle]
-pub extern fn key_is_down() -> bool {
-  unsafe {
-    if KEYROW == 0 && KEYCOL >= 2 && KEYCOL <= 9 {
-      let kbdips = 0b0000_0000; // TODO, stub
-      return kbdips & (1 << (9 - KEYCOL)) != 0;
-    } else {
-      return BBCMATRIX[KEYCOL as usize][KEYROW as usize];
+pub extern fn key_is_down(_state: *mut State) -> bool {
+  let keyrow = unsafe { KEYROW };
+  let keycol = unsafe { KEYCOL };
+  assert!(keyrow < 8);
+  assert!(keycol < 10);
+  if keyrow == 0 && keycol >= 2 && keycol <= 9 {
+    let kbdips = 0b0000_0000; // TODO, stub
+    return kbdips & (1 << (9 - keycol)) != 0;
+  } else {
+    unsafe {
+      return BBCMATRIX[keycol as usize][keyrow as usize];
     }
   }
 }
@@ -165,7 +182,7 @@ unsafe fn set_singleton(callback: Box<Keypress>) {
 }
 
 #[no_mangle]
-pub extern fn key_paste_poll() {
+pub extern fn key_paste_poll(_state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
   unsafe {
@@ -189,7 +206,7 @@ unsafe fn characterization_test() {
   sysvia_write(via, 0, 1);
   sysvia_poll(via, 1);
 
-  assert_eq!(get_interrupt(s), 0);
+  assert_eq!((*s).interrupt, 0);
   sysvia_delete(via);
   free_state(s);
 }

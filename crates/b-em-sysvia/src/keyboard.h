@@ -39,9 +39,9 @@
 //extern void key_init(void);
 //extern void key_reset(void);
 //extern void key_check(void);
-extern void key_paste_poll(void);
-extern void key_scan(int row, int col);
-extern bool key_is_down(void);
+extern void key_paste_poll(void* state);
+extern void key_scan(void* state, int row, int col);
+extern bool key_is_down(void* state);
 //extern bool key_any_down(void);
 //extern bool key_code_down(int code);
 
