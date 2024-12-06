@@ -47,23 +47,6 @@ impl Drop for Sysvia {
 }
 
 #[repr(C)]
-pub struct State {
-  /*Current state of IC32 output*/
-  ic32: u8,
-  /*Current effective state of the slow data bus*/
-  sdbval: u8,
-  /*What the System VIA is actually outputting to the slow data bus
-    For use when contending with whatever else is outputting to the bus*/
-  sysvia_sdb_out: u8,
-
-  scrsize: u32,
-
-  via: *mut Cvia,
-  interrupt: u32,
-  keyboard: Keyboard
-}
-
-#[repr(C)]
 struct Keyboard {
   keyrow: u32,
   keycol: u32,
@@ -116,6 +99,23 @@ impl Keyboard {
   }
 }
 
+#[repr(C)]
+pub struct State {
+  /*Current state of IC32 output*/
+  ic32: u8,
+  /*Current effective state of the slow data bus*/
+  sdbval: u8,
+  /*What the System VIA is actually outputting to the slow data bus
+    For use when contending with whatever else is outputting to the bus*/
+  sysvia_sdb_out: u8,
+
+  scrsize: u32,
+
+  via: *mut Cvia,
+  interrupt: u32,
+  keyboard: Keyboard
+}
+
 impl State {
   fn new(keypress: Box<Keypress>) -> Self {
     let bbcmatrix = [[false; 8]; 10];
@@ -138,6 +138,12 @@ extern {
   fn sysvia_write(via: *mut Cvia, address: u16, value: u8);
   fn sysvia_set_ca2(via: *mut Cvia, level: u32);
   fn sysvia_poll(via: *mut Cvia, cycles: u32);
+}
+
+#[no_mangle]
+pub extern fn raise_interrupt(state: *mut State, value: u32) {
+  let interrupt = unsafe { &mut (*state).interrupt };
+  *interrupt = value;
 }
 
 #[no_mangle]

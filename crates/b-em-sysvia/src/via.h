@@ -1,7 +1,8 @@
 #ifndef __INC_VIA_H
 #define __INC_VIA_H
 
-typedef void* port_t;
+typedef struct state_t state_t;
+void raise_interrupt(state_t* state, int level);
 
 typedef struct VIA VIA;
 typedef struct VIA
@@ -18,13 +19,10 @@ typedef struct VIA
         int      intnum;
         int      sr_count;
 
-        port_t   port_a;
-        port_t   port_b;
-
-        uint8_t  (*read_portA)(port_t port);
-        uint8_t  (*read_portB)(port_t port);
-        void     (*write_portA)(port_t port, uint8_t val);
-        void     (*write_portB)(port_t port, uint8_t val);
+        uint8_t  (*read_portA)(state_t* state);
+        uint8_t  (*read_portB)(state_t* state);
+        void     (*write_portA)(state_t* state, uint8_t val);
+        void     (*write_portB)(state_t* state, uint8_t val);
 
         void     (*set_ca1)(VIA* sysvia, int level);
         void     (*set_ca2)(VIA* sysvia, int level);
@@ -32,7 +30,7 @@ typedef struct VIA
         void     (*set_cb2)(VIA* sysvia, int level);
         void     (*timer_expire1)(void *);
 
-        int      *interrupt;
+        state_t* state;
 } VIA;
 
 uint8_t via_read(VIA *v, uint16_t addr);

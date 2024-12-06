@@ -76,12 +76,12 @@ typedef struct state_t {
   int scrsize;
 //int kbdips;
   VIA* via;
-  int interrupt;
+//int interrupt;
 
-  int keyrow, keycol;
+//int keyrow, keycol;
 
   // keep this as last item
-  int keypress_filler[16]; // not sure what Rust Box<FnMut> looks like
+  int filler[64];
 } state_t;
 
 /*Calculate current state of slow data bus
@@ -120,21 +120,18 @@ static void sysvia_write_IC32(state_t* s, uint8_t val)
 //        cmos_update(IC32, sdbval);
 }
 
-void sysvia_write_portA(port_t port_a, uint8_t val)
+void sysvia_write_portA(state_t* state, uint8_t val)
 {
-        state_t* s = (state_t*) port_a;
+        state->sysvia_sdb_out = val;
 
-        s->sysvia_sdb_out = val;
-
-        sysvia_update_sdb(s);
+        sysvia_update_sdb(state);
 
 //      if (MASTER && !compactcmos) cmos_update(IC32, sdbval);
 }
 
-void sysvia_write_portB(port_t port_b, uint8_t val)
+void sysvia_write_portB(state_t* state, uint8_t val)
 {
-        state_t* s = (state_t*) port_b;
-        sysvia_write_IC32(s, val);
+        sysvia_write_IC32(state, val);
         /*Master 128 reuses the speech processor inputs*/
 //      if (MASTER && !compactcmos)
 //           cmos_writeaddr(val);
@@ -143,15 +140,14 @@ void sysvia_write_portB(port_t port_b, uint8_t val)
 //           compactcmos_i2cchange(val & 0x20, val & 0x10);
 }
 
-uint8_t sysvia_read_portA(port_t port_a)
+uint8_t sysvia_read_portA(state_t* state)
 {
-        state_t* s = (state_t*) port_a;
-        sysvia_update_sdb(s);
+        sysvia_update_sdb(state);
 
-        return s->sdbval;
+        return state->sdbval;
 }
 
-uint8_t sysvia_read_portB(port_t /*port_b*/)
+uint8_t sysvia_read_portB(state_t* /*state*/)
 {
         uint8_t temp = 0xFF;
 //      if (compactcmos)
@@ -188,9 +184,7 @@ VIA* sysvia_new(state_t* state)
         via_reset(sysvia);
 
         state->via = sysvia; // circular!
-        sysvia->port_a = state;
-        sysvia->port_b = state;
-        sysvia->interrupt = &state->interrupt;
+        sysvia->state = state;
 
         sysvia->read_portA = sysvia_read_portA;
         sysvia->read_portB = sysvia_read_portB;
@@ -207,8 +201,7 @@ VIA* sysvia_new(state_t* state)
 
 void sysvia_delete(VIA* sysvia)
 {
-        state_t* state = (state_t*) sysvia->port_a; // HACKY!
-        state->via = (VIA*) 0; // break cycle
+        sysvia->state->via = (VIA*) 0; // break cycle
         free(sysvia);
 }
 
