@@ -1,21 +1,27 @@
-use b_em_sysvia::{Keypress, Sysvia};
+use std::rc::Rc;
+
+use b_em_sysvia::{Interrupt, Keypress, Sysvia};
 
 use crate::devices::Clocked;
 use crate::memory::{Address, MemoryBus};
-use crate::mos6522::Device;
+use crate::mos6522::{Device, Signal};
 
 pub struct AltVIA {
+  pub irq: Rc<Signal>,// shared, hard-wired to other IRQ sources for logic "OR"
   via: Sysvia,
   micros: u64
 }
 
 impl AltVIA {
   pub fn new() -> Self {
+    let irq = Rc::new(Signal::new());
     let poll_keyboard = make_keypress(); // TODO
-    let raise_interrupt = Box::new(| value | {
-      log::trace!("AltVIA: interrupt {value}");
-    });
-    AltVIA { via: Sysvia::new(poll_keyboard, raise_interrupt), micros: 0 }
+    let raise_interrupt = make_interrupt(irq.clone());
+    AltVIA {
+      irq,
+      via: Sysvia::new(poll_keyboard, raise_interrupt),
+      micros: 0
+    }
   }
 }
 
@@ -56,5 +62,14 @@ fn make_keypress() -> Box<Keypress> {
     }
 //  println!("Keyboard: pressed={pressed}, key_code={key_code:x}");
     (key_code, pressed)
+  })
+}
+
+fn make_interrupt(irq: Rc<Signal>) -> Box<Interrupt> {
+  Box::new(move | value | {
+    if value != 0 {
+      log::trace!("AltVIA: interrupt {value}");
+      irq.raise();
+    }
   })
 }

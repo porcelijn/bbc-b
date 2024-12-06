@@ -108,10 +108,12 @@ impl SheilaPage {
     let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard);
     system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
     let crtc = Rc::new(RefCell::new(crtc));
-    let alt_sysvia = Rc::new(RefCell::new(AltVIA::new()));
+    let alt_sysvia = AltVIA::new();
+    let irq = alt_sysvia.irq.clone();
+    let alt_sysvia = Rc::new(RefCell::new(alt_sysvia));
     let system_port_b = SystemPortB::new(ic32);
-    let system_via = SystemVIA::new(system_port_a, system_port_b);
-    let irq = system_via.irq.clone();
+    let mut system_via = SystemVIA::new(system_port_a, system_port_b);
+    system_via.irq = irq.clone();
     let system_via = Rc::new(RefCell::new(system_via));
     let mut user_via = UserVIA::new(UserPortA::new(0), UserPortB::new(0));
     user_via.irq = irq.clone(); // connect IRQB wires for logic "OR"

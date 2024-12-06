@@ -34,7 +34,8 @@ fn main() {
   assert_eq!(read_address(&ram, irq_vector).to_u16(), 0xDC1C); // as per MOS
   let mut mem = PageDispatcher::new(Box::new(ram));
   let keyboard = Rc::new(RefCell::new(Keyboard::new()));
-  let sheila = SheilaPage::new(keyboard.clone());
+  let mut sheila = SheilaPage::new(keyboard.clone());
+  sheila.use_alt_system_via = true;
   let irq_level = sheila.irq.clone();
   let clocked_devices: ClockedDevices = sheila.get_clocked_devices();
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
