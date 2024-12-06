@@ -5,10 +5,11 @@ pub struct Sysvia {
 }
 
 pub type Keypress = dyn FnMut() -> (u8, bool);
+pub type Interrupt = dyn FnMut(u32);
 
 impl Sysvia {
-  pub fn new(callback: Box<Keypress>) -> Self {
-    let state = Box::new(State::new(callback));
+  pub fn new(keypress: Box<Keypress>, interrupt: Box<Interrupt>) -> Self {
+    let state = Box::new(State::new(keypress, interrupt));
     let state = Box::into_raw(state);
     let via = unsafe { sysvia_new(state) };
     Sysvia{ via, state }
@@ -27,11 +28,6 @@ impl Sysvia {
 
   pub fn step(&self, ticks: u32) {
     unsafe { sysvia_poll(self.via, ticks) };
-  }
-
-  pub fn has_irq(&self) -> bool {
-    let state = unsafe { &*(self.state) };
-    state.interrupt != 0
   }
 }
 
@@ -112,19 +108,19 @@ pub struct State {
   scrsize: u32,
 
   via: *mut Cvia,
-  interrupt: u32,
+  interrupt: Box<Interrupt>,
   keyboard: Keyboard
 }
 
 impl State {
-  fn new(keypress: Box<Keypress>) -> Self {
+  fn new(keypress: Box<Keypress>, interrupt: Box<Interrupt>) -> Self {
     let bbcmatrix = [[false; 8]; 10];
     let keyboard = Keyboard {
       keyrow: 0, keycol: 0,
       keypress, kbdips: 0b0000_0000, bbcmatrix,
     };
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
-            via: std::ptr::null_mut(), interrupt: 0, keyboard }
+            via: std::ptr::null_mut(), interrupt, keyboard }
   }
 }
 
@@ -143,7 +139,7 @@ extern {
 #[no_mangle]
 pub extern fn raise_interrupt(state: *mut State, value: u32) {
   let interrupt = unsafe { &mut (*state).interrupt };
-  *interrupt = value;
+  interrupt(value);
 }
 
 #[no_mangle]
@@ -228,7 +224,10 @@ pub extern fn key_paste_poll(state: *mut State) {
 
 #[allow(unused)]
 unsafe fn characterization_test() {
-  let s = State::new(Box::new(|| (0x69, false)));
+  let s = State::new(Box::new(|| (0x69, false)),
+                     Box::new(|interrupt| {
+                       assert_eq!(interrupt, 0);
+                     }));
   let s = Box::into_raw(Box::new(s));
   let via = sysvia_new(s);
   let v = sysvia_read(via, 0);
@@ -236,7 +235,6 @@ unsafe fn characterization_test() {
   sysvia_write(via, 0, 1);
   sysvia_poll(via, 1);
 
-  assert_eq!((*s).interrupt, 0);
   sysvia_delete(via);
   drop(Box::from_raw(s));
 }
@@ -254,24 +252,30 @@ fn test() {
     (key_code, pressed)
   };
 
-  let sysvia = Sysvia::new(Box::new(input));
+  let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
+  let has_irq_alias = has_irq.clone();
+  let interrupt = move |value| {
+    has_irq_alias.set(value != 0);
+  };
+
+  let sysvia = Sysvia::new(Box::new(input), Box::new(interrupt));
   let v = sysvia.read(0);
   assert_eq!(v, 0xFF); // via_read_null()
   sysvia.write(0, 1);
   sysvia.step(100);
 
-  assert_eq!(sysvia.has_irq(), false);
+  assert_eq!(has_irq.get(), false);
   sysvia.write(14, 0xFF); // ier, enable all interrupts
   sysvia.write(13, 0x7F); // ifr, clear all interrupts
 
-  assert_eq!(sysvia.has_irq(), false);
+  assert_eq!(has_irq.get(), false);
   unsafe { // negative edge
     sysvia_set_ca2(sysvia.via, 1);
     sysvia_set_ca2(sysvia.via, 0);
   }
-  assert_eq!(sysvia.has_irq(), true);
+  assert_eq!(has_irq.get(), true);
 
   sysvia.write(13, 0x7F); // ifr, clear all interrupts
-  assert_eq!(sysvia.has_irq(), false);
+  assert_eq!(has_irq.get(), false);
 }
 

@@ -12,7 +12,10 @@ pub struct AltVIA {
 impl AltVIA {
   pub fn new() -> Self {
     let poll_keyboard = make_keypress(); // TODO
-    AltVIA { via: Sysvia::new(poll_keyboard), micros: 0 }
+    let raise_interrupt = Box::new(| value | {
+      log::trace!("AltVIA: interrupt {value}");
+    });
+    AltVIA { via: Sysvia::new(poll_keyboard, raise_interrupt), micros: 0 }
   }
 }
 
