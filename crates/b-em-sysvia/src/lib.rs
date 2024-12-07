@@ -148,14 +148,10 @@ pub extern fn raise_interrupt(state: *mut State, value: u32) {
   interrupt(value);
 }
 
-#[no_mangle]
-pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
+fn key_update(state: *mut State) {
   let cvia = unsafe { (*state).via };
   let ic32 = unsafe { (*state).ic32 };
   let keyboard = unsafe { &mut (*state).keyboard };
-
-  keyboard.keyrow = row;
-  keyboard.keycol = col;
 
   let scan = if ic32 & 8 != 0 {
     /* autoscan mode */
@@ -166,6 +162,16 @@ pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   };
 
   unsafe { sysvia_set_ca2(cvia, scan as u32); }
+}
+
+#[no_mangle]
+pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
+  let keyboard = unsafe { &mut (*state).keyboard };
+
+  keyboard.keyrow = row;
+  keyboard.keycol = col;
+
+  key_update(state);
 }
 
 #[no_mangle]
@@ -226,6 +232,7 @@ pub extern fn key_paste_poll(state: *mut State) {
   // wire to keyboard through callback
   let keyboard = unsafe { &mut (*state).keyboard };
   keyboard.update_keys();
+  key_update(state);  
 }
 
 #[allow(unused)]
