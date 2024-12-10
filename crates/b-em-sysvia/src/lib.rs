@@ -43,18 +43,32 @@ impl Drop for Sysvia {
 }
 
 #[repr(C)]
-struct Keyboard {
-  keyrow: u32,
-  keycol: u32,
+pub struct Keyboard {
+  pub keyrow: u32,
+  pub keycol: u32,
 
   keypress: Box<Keypress>,
   kbdips: u8,
   bbcmatrix: [[bool; 8]; 10],
 }
 
+impl std::fmt::Debug for Keyboard {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    Ok(()) // TODO
+  }
+}
+
 impl Keyboard {
   const MAXCOL: u32 = 10;
-  fn scan_all(&self) -> bool {
+  pub fn new(keypress: Box<Keypress>) -> Self {
+    Keyboard {
+      keyrow: 0, keycol: 0,
+      keypress,
+      kbdips: 0b0000_0000, bbcmatrix: [[false; 8]; 10]
+    }
+  }
+
+  pub fn scan_all(&self) -> bool {
     for col in 0..Self::MAXCOL {
       for row in 1..8 {
         if self.bbcmatrix[col as usize][row as usize] {
@@ -65,7 +79,7 @@ impl Keyboard {
     false
   }
 
-  fn scan_col(&self) -> bool {
+  pub fn scan_col(&self) -> bool {
     if self.keycol < Self::MAXCOL {
       for row in 1..8 {
         if self.bbcmatrix[self.keycol as usize][row as usize] {
@@ -76,7 +90,7 @@ impl Keyboard {
     false
   }
 
-  fn scan_key(&self) -> bool {
+  pub fn scan_key(&self) -> bool {
     if self.keycol == 15 {
       assert_eq!(self.keyrow, 0);
       // this is the exceptional case where MOS1.20 strobes invalid col before
@@ -92,7 +106,7 @@ impl Keyboard {
     self.kbdips & (1 << (9 - self.keycol)) != 0
   }
 
-  fn update_keys(&mut self) {
+  pub fn update_keys(&mut self) {
     let (key_code, pressed) = (self.keypress)();
     let row = (key_code & 0b0111_0000) >> 4;
     let col = (key_code & 0b0000_1111) >> 0;
@@ -120,13 +134,9 @@ pub struct State {
 
 impl State {
   fn new(keypress: Box<Keypress>, interrupt: Box<Interrupt>) -> Self {
-    let bbcmatrix = [[false; 8]; 10];
-    let keyboard = Keyboard {
-      keyrow: 0, keycol: 0,
-      keypress, kbdips: 0b0000_0000, bbcmatrix,
-    };
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
-            via: std::ptr::null_mut(), interrupt, keyboard }
+            via: std::ptr::null_mut(), interrupt,
+            keyboard: Keyboard::new(keypress) }
   }
 }
 

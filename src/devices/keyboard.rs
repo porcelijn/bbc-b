@@ -1,13 +1,19 @@
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
+use b_em_sysvia::Keyboard as B_em;
+
 // The keyboard consists of 8 rows, 10 columns of wires
 // bottom row (a. o. SHIFT, CTRL) does not cause interrupts
 // bottom row 2-9 is wired to a dip switch that controls boot options
 //
-
 const MAX_COL: u8 = 10;
 
 #[derive(Debug)]
 pub struct Keyboard {
   matrix: [u8; MAX_COL as usize],
+  hack_key: Rc<Cell<(u8, bool)>>, // for callback
+  b_em: RefCell<B_em>,
 }
 
 impl Keyboard {
@@ -16,7 +22,12 @@ impl Keyboard {
   }
 
   pub fn new() -> Self {
-    Keyboard { matrix: [0; MAX_COL as usize] }
+    let hack_key = Rc::new(Cell::new((0, false)));
+    let press = hack_key.clone();
+    // dummy, because we'll poke straight into bbcmatrix 
+    let dummy_keypress = Box::new(move || { press.get() });
+    let b_em = RefCell::new(B_em::new(dummy_keypress));
+    Keyboard { matrix: [0; MAX_COL as usize], hack_key, b_em }
   }
 
   fn read(&self, row: u8, col: u8) -> bool {
@@ -25,6 +36,9 @@ impl Keyboard {
     assert!(row < 8 && col < MAX_COL);
     let value = self.matrix[col as usize] & Self::mask(row) != 0;
     log::trace!("Keyboard: {row}, {col} = {value}");
+    self.b_em.borrow_mut().keyrow = row as u32;
+    self.b_em.borrow_mut().keycol = col as u32;
+    assert_eq!(value, self.b_em.borrow().scan_key());
     value
   }
 
@@ -35,6 +49,8 @@ impl Keyboard {
     } else {
       self.matrix[col as usize] &= !Self::mask(row);
     }
+    self.hack_key.set((row << 4 | col, value));
+    self.b_em.borrow_mut().update_keys();
   }
 
   pub fn is_key_pressed(&self, key_code: u8) -> bool {
