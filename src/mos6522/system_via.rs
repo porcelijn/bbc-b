@@ -52,7 +52,7 @@ impl Port for SystemPortA {
     (ca1, ca2)
   }
 
-  fn read(&self, ddr_mask: u8) -> u8 {
+  fn read(&self, _ddr_mask: u8) -> u8 {
     let mut value = self.pa; // retrieve last value
 
     let auto_scan = self.ic32.has::<{IC32::KEYBOARD}>();
@@ -72,7 +72,7 @@ impl Port for SystemPortA {
       // receive value from TMS5220 speech chip over slow data bus
     }
 
-    let value = value & !ddr_mask; // return only bits marked input/read
+//  let value = value & !ddr_mask; // return only bits marked input/read
     value
   }
 

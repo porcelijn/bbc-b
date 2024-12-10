@@ -78,21 +78,21 @@ fn interrogate_keyboard() {
     cpu.registers.x = key_code;
     interrogate_keyboard(&mut cpu, &mut mem);
     assert!(!cpu.registers.p.has::<'N'>()); // Not pressed
-    assert_eq!(cpu.registers.x, 0x00);      // Not pressed
+    assert_eq!(cpu.registers.x, key_code);  // Not pressed
 
     keyboard.borrow_mut().press_key_ascii('0' as u8);
 
     cpu.registers.x = key_code;
     interrogate_keyboard(&mut cpu, &mut mem);
-    assert!(cpu.registers.p.has::<'N'>());  // Pressed
-    assert_eq!(cpu.registers.x, PRESSED);   // Pressed
+    assert!(cpu.registers.p.has::<'N'>());           // Pressed
+    assert_eq!(cpu.registers.x, key_code | PRESSED); // Pressed
 
     keyboard.borrow_mut().release_key_ascii('0' as u8);
 
     cpu.registers.x = key_code;
     interrogate_keyboard(&mut cpu, &mut mem);
     assert!(!cpu.registers.p.has::<'N'>()); // Released
-    assert_eq!(cpu.registers.x, 0x00);      // Released
+    assert_eq!(cpu.registers.x, key_code);  // Released
   }
 
   // Repeat with CA2 interrupt and keyboard autoscan enabled, now press 'A'
@@ -112,7 +112,7 @@ fn interrogate_keyboard() {
     enable_keyboard_autoscan(&mut mem);
     interrogate_keyboard(&mut cpu, &mut mem);
     assert!(!cpu.registers.p.has::<'N'>()); // Not pressed
-    assert_eq!(cpu.registers.x, 0x00);      // Not pressed
+    assert_eq!(cpu.registers.x, key_code);  // Not pressed
 
     keyboard.borrow_mut().press_key_ascii('A' as u8);
 
@@ -130,15 +130,15 @@ fn interrogate_keyboard() {
     cpu.registers.x = key_code;
     enable_keyboard_autoscan(&mut mem);
     interrogate_keyboard(&mut cpu, &mut mem);
-    assert!(cpu.registers.p.has::<'N'>());  // Pressed
-    assert_eq!(cpu.registers.x, PRESSED);   // Pressed
+    assert!(cpu.registers.p.has::<'N'>());           // Pressed
+    assert_eq!(cpu.registers.x, PRESSED | key_code); // Pressed
 
     cpu.registers.p.set_flag::<'I', true>();
     cpu.registers.x = 0; // SHIFT keycode
     enable_keyboard_autoscan(&mut mem);
     interrogate_keyboard(&mut cpu, &mut mem);
     assert!(cpu.registers.p.has::<'N'>());
-    assert_eq!(cpu.registers.x, PRESSED);
+    assert_eq!(cpu.registers.x, PRESSED | 0); // SHIFT
 
     keyboard.borrow_mut().release_key_ascii('A' as u8);
 
@@ -148,12 +148,12 @@ fn interrogate_keyboard() {
     enable_keyboard_autoscan(&mut mem);
     interrogate_keyboard(&mut cpu, &mut mem);
     assert!(!cpu.registers.p.has::<'N'>()); // Released
-    assert_eq!(cpu.registers.x, 0x00);      // Released
+    assert_eq!(cpu.registers.x, key_code);  // Released
 
     // Also check shift release
     cpu.registers.x = 0;
     interrogate_keyboard(&mut cpu, &mut mem);
-    assert_eq!(cpu.registers.x, 0x00);
+    assert_eq!(cpu.registers.x, 0);
   }
 }
 
