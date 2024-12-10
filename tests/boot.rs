@@ -53,9 +53,8 @@ fn os120_reset_with_sheila() {
   let mut ram = RAM::new();
   ram.load_bin_at("images/os120.bin", Address::from(0xC000));
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new(Rc::new(RefCell::new(Keyboard::new())));
-//sheila.use_alt_system_via = true;
-//sheila.use_alt_system_via = false;
+  let mut sheila = SheilaPage::new(Rc::new(RefCell::new(Keyboard::new())));
+  sheila.use_alt_system_via = true;
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   let mut cpu = CPU::new();

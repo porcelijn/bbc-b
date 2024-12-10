@@ -99,11 +99,12 @@ pub struct SystemPortB {
   // PB6, PB7: input from speech processor
   pb: u8, // Latched value written to / read from PB0-7
   ic32: Rc<IC32>,
+  joybuttons: (bool, bool), // TODO
 }
 
 impl SystemPortB {
   pub fn new(ic32: Rc<IC32>) -> Self {
-    SystemPortB { pb: 0, ic32 }
+    SystemPortB { pb: 0, ic32, joybuttons: (false, false) }
   }
 
   const fn decode(value: u8) -> (u8, bool) {
@@ -125,9 +126,13 @@ impl Port for SystemPortB {
   }
 
   fn read(&self, ddr_mask: u8) -> u8 {
+    let mut result = 0xFF & !ddr_mask;
     // PB4 and PB5: joystick buttons
+    if self.joybuttons.0 { result &= !(1 << 4); } // PB4
+    if self.joybuttons.1 { result &= !(1 << 5); } // PB5
+
     // PB6 and PB7: inputs from speech processor (interrupt & ready, resp)
-    self.pb & !ddr_mask
+    result
   }
 
   fn write(&mut self, value: u8, ddr_mask: u8) {
