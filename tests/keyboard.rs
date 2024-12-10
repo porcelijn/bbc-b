@@ -221,10 +221,8 @@ fn loop_keyboard() {
   ram.load_at(&MOS_CLIP, START);
   let keyboard = Rc::new(RefCell::new(Keyboard::new()));
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new(keyboard.clone());
-
-  // TODO: currently differences between control line -> IRQ mapping
-//sheila.use_alt_system_via =  true;
+  let mut sheila = SheilaPage::new(keyboard.clone());
+  sheila.use_alt_system_via =  true;
   let irq_level = sheila.irq.clone();
   let cds = sheila.get_clocked_devices();
   mem.add_backend(SheilaPage::page(), Box::new(sheila));

@@ -16,13 +16,17 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 * Instruction execution puts PC increment in wrong place
 * No timing or cycle counting whatsoever
 * Missing 99% peripherals
-* Has only 10% of mos6522 logic for system VIA and rudiments of keyboard
+* Has only 11% of mos6522 logic for system VIA and rudiments of keyboard
   interface
 * Write protect ROM area, paged ROM/RAM bank switching, JIM, FRED, ...
 * Needs quick 'n' dirty frame buffer to see what's going on (do proper video
   ULA and 6845 later)
 * OMG, [Toby Nelson](https://tobylobster.github.io/mos/mos/index.html)'s
   annotated MOS assembly is a treasure!
+* Added somewhat and refactored *B-em* C implementation of 6522 (system) VIA
+  [wrapped in Rust](crates/b-em-sysvia/README.md)
+* Intent is not to keep it there permanently but to compare behaviour to my own
+  implementation and hopefully manage to emulate a *working* keyboard that way
 
 ---
 Hmmm. So far so good. Booting the OS 1.20 ROM and looking for signs of live in
