@@ -474,29 +474,38 @@ impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
     self.update_ca1(ca1);
     self.update_ca2(ca2);
 
-    if self.t1_active.get() {
-      if self.t1c <= ticks {
-        let difference = ticks - self.t1c;
-        self.set_ifr_bits(Self::IFR_T1_BIT);
+    // per W65c22 datasheet: PB7, IRQB output in N+2 cycles
+    fn expires(timer: u16, ticks: u16) -> bool {
+      if 0xFFFE <= timer {
+        // timer has wrapped
+        timer - ticks <= 0xFFFE
+      } else {
+        // experies 2 ticks after wrapping through 0
+        timer + 2 < ticks
+      }
+    }
 
+    if self.t1_active.get() {
+      if expires(self.t1c, ticks) {
+        self.set_ifr_bits(Self::IFR_T1_BIT);
         if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
           // free run
+          let difference = ticks + 2 - self.t1c.wrapping_add(2);
           assert!(difference <= self.t1l);
           self.t1c = self.t1l - difference;
         } else {
           // one shot
           self.t1_active.set(false);
-          self.t1c = 0xFFFF - difference;
         }
         self.update_port_b7();
       } else {
-        self.t1c -= ticks;
+        self.t1c = self.t1c.wrapping_sub(ticks);
       }
     }
 
     if self.acr & Self::ACR_T2_PB6_BIT == 0 {
       // T2 triggered by phase 2 clock (timed interrupt)
-      if self.t2c <= ticks && self.t2_active.get() {
+      if expires(self.t2c, ticks) && self.t2_active.get() {
         self.t2_active.set(false);
         self.set_ifr_bits(Self::IFR_T2_BIT);
       }
@@ -561,15 +570,17 @@ fn via_timer1() {
   let pa = BogusPort::<'A'>::new(0);
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
+  via.write(Address::from(6), 0);
   via.write(Address::from(5), 0); // activate t1
   via.step(100);
   assert!(!via.irq.sense());
+  assert_eq!(via.read(Address::from(13)), 1 << 6); // check IFR_T1_BIT
   via.write(Address::from(14), BIT7 | 1 << 6); // set IER_T1_BIT
   assert!(via.irq.sense());
   via.write(Address::from(13), 1 << 6); // clear IFR_T1_BIT
   via.update_ifr_irq(); // re-evaluate IRQ
   assert!(!via.irq.sense());
-  via.write(Address::from(6), 1); // T1L-low
+  via.write(Address::from(6), 42); // T1L-low
   // timer won't start till we write to T1 high latch
   assert!(!via.irq.sense());
   assert_eq!(via.port_b.read(0), 0);
@@ -579,15 +590,20 @@ fn via_timer1() {
   assert_eq!(via.port_b.read(0), 0); // Auxiliary control bit 7 not set
 
   // read clears interrupt
-  let v = via.read(Address::from(4)); // T1C-low
+  via.read(Address::from(4)); // T1C-low
   via.update_ifr_irq(); // re-evaluate IRQ
   assert!(!via.irq.sense());
-  assert_eq!(v, 156); // 255 + 1 (from t1l) - 100 ticks
+
   // ACR square wave on Port B bit 7
   via.write(Address::from(11), 1 << 7); // ACR_T1_PB7_BIT
-  via.write(Address::from(5), 128); // T1C-high; restart timer
-  via.step(300);
-//assert!(via.interrupt_requested());
-//assert_eq!(via.port_b.read(0), 0x80);
+  via.write(Address::from(5), 1); // T1C-high; restart timer: 256 + 42
+  via.step(250);
+  assert_eq!(via.read(Address::from(4)), 248);
+  assert_eq!(via.read(Address::from(5)), 0);
+  assert!(!via.irq.sense());
+  via.step(550);
+
+  assert!(via.irq.sense());
+  assert_eq!(via.port_b.read(0), 0x80);
 }
 
