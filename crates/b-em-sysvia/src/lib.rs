@@ -279,13 +279,15 @@ fn test() {
     (key_code, pressed)
   };
 
+  let keyboard = Keyboard::new(Box::new(input));
+
   let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
   let has_irq_alias = has_irq.clone();
   let interrupt = move |value| {
     has_irq_alias.set(value != 0);
   };
 
-  let sysvia = Sysvia::new(Box::new(input), Box::new(interrupt));
+  let sysvia = Sysvia::new(Rc::new(RefCell::new(keyboard)), Box::new(interrupt));
   let v = sysvia.read(0);
   assert_eq!(v, 0xFF); // via_read_null()
   sysvia.write(0, 1);
