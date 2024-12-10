@@ -1,8 +1,10 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 
-use b_em_sysvia::{Interrupt, Keypress, Sysvia};
+use b_em_sysvia::{Interrupt, Sysvia};
 
 use crate::devices::Clocked;
+use crate::devices::keyboard::Keyboard;
 use crate::memory::{Address, MemoryBus};
 use crate::mos6522::{Device, Signal};
 
@@ -13,13 +15,13 @@ pub struct AltVIA {
 }
 
 impl AltVIA {
-  pub fn new() -> Self {
+  pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
     let irq = Rc::new(Signal::new());
-    let poll_keyboard = make_keypress(); // TODO
     let raise_interrupt = make_interrupt(irq.clone());
+    let b_em = keyboard.borrow().b_em.clone();
     AltVIA {
       irq,
-      via: Sysvia::new(poll_keyboard, raise_interrupt),
+      via: Sysvia::new(b_em, raise_interrupt),
       micros: 0
     }
   }
@@ -47,22 +49,6 @@ impl MemoryBus for AltVIA {
   fn write(&mut self, address: Address, value: u8) {
     self.via.write(address.to_u16(), value);
   }
-}
-
-fn make_keypress() -> Box<Keypress> {
-  // somewhat random keypress and release
-  let mut seed = 0u8;
-  Box::new(move || -> (u8, bool) {
-    let key_code = (seed / 3) & 0b0111_0111;
-    let pressed = seed % 3 == 0;
-    if seed > 200 {
-      seed = 0;
-    } else {
-      seed += 1;
-    }
-//  println!("Keyboard: pressed={pressed}, key_code={key_code:x}");
-    (key_code, pressed)
-  })
 }
 
 fn make_interrupt(irq: Rc<Signal>) -> Box<Interrupt> {

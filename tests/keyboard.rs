@@ -38,7 +38,8 @@ fn interrogate_keyboard() {
   ram.load_at(&MOS_CLIP, start);
   let keyboard = Rc::new(RefCell::new(Keyboard::new()));
   let mut mem = PageDispatcher::new(Box::new(ram));
-  let sheila = SheilaPage::new(keyboard.clone());
+  let mut sheila = SheilaPage::new(keyboard.clone());
+  sheila.use_alt_system_via =  true;
 
   // pre-condition: configure system VIA DDRB to IIIIOOOO, where O's map to ic32
   let system_via_ddrb = Address::from(0xFE42);
@@ -218,6 +219,9 @@ fn loop_keyboard() {
   let keyboard = Rc::new(RefCell::new(Keyboard::new()));
   let mut mem = PageDispatcher::new(Box::new(ram));
   let sheila = SheilaPage::new(keyboard.clone());
+
+  // TODO: currently differences between control line -> IRQ mapping
+//sheila.use_alt_system_via =  true;
 
   // pre-condition: configure system VIA DDRB to IIIIOOOO, where O's map to ic32
   let system_via_ddrb = Address::from(0xFE42);

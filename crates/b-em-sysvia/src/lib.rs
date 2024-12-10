@@ -1,3 +1,6 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 // a quasi object shim that delegates to C implementation singleton
 pub struct Sysvia {
   via: *mut Cvia,
@@ -8,8 +11,8 @@ pub type Keypress = dyn FnMut() -> (u8, bool);
 pub type Interrupt = dyn FnMut(u32);
 
 impl Sysvia {
-  pub fn new(keypress: Box<Keypress>, interrupt: Box<Interrupt>) -> Self {
-    let state = Box::new(State::new(keypress, interrupt));
+  pub fn new(keyboard: Rc<RefCell<Keyboard>>, interrupt: Box<Interrupt>) -> Self {
+    let state = Box::new(State::new(keyboard, interrupt));
     let state = Box::into_raw(state);
     let via = unsafe { sysvia_new(state) };
     Sysvia{ via, state }
@@ -53,7 +56,7 @@ pub struct Keyboard {
 }
 
 impl std::fmt::Debug for Keyboard {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     Ok(()) // TODO
   }
 }
@@ -129,14 +132,14 @@ pub struct State {
 
   via: *mut Cvia,
   interrupt: Box<Interrupt>,
-  keyboard: Keyboard
+  keyboard: Rc<RefCell<Keyboard>>,
 }
 
 impl State {
-  fn new(keypress: Box<Keypress>, interrupt: Box<Interrupt>) -> Self {
+  fn new(keyboard: Rc<RefCell<Keyboard>>, interrupt: Box<Interrupt>) -> Self {
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
             via: std::ptr::null_mut(), interrupt,
-            keyboard: Keyboard::new(keypress) }
+            keyboard }
   }
 }
 
@@ -165,10 +168,10 @@ fn key_update(state: *mut State) {
 
   let scan = if ic32 & 8 != 0 {
     /* autoscan mode */
-    keyboard.scan_all()
+    keyboard.borrow().scan_all()
   } else {
     /* scan specific key mode */
-    keyboard.scan_col()
+    keyboard.borrow().scan_col()
   };
 
   unsafe { sysvia_set_ca2(cvia, scan as u32); }
@@ -178,8 +181,8 @@ fn key_update(state: *mut State) {
 pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   let keyboard = unsafe { &mut (*state).keyboard };
 
-  keyboard.keyrow = row;
-  keyboard.keycol = col;
+  keyboard.borrow_mut().keyrow = row;
+  keyboard.borrow_mut().keycol = col;
 
   key_update(state);
 }
@@ -187,10 +190,10 @@ pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
 #[no_mangle]
 pub extern fn key_is_down(state: *const State) -> bool {
   let keyboard = unsafe { &(*state).keyboard };
-  if keyboard.keyrow == 0 && keyboard.keycol >= 2 && keyboard.keycol <= 9 {
-    keyboard.scan_dip()
+  if keyboard.borrow().keyrow == 0 && keyboard.borrow().keycol >= 2 && keyboard.borrow().keycol <= 9 {
+    keyboard.borrow().scan_dip()
   } else {
-    keyboard.scan_key()
+    keyboard.borrow().scan_key()
   }
 }
 
@@ -241,13 +244,14 @@ pub extern fn key_paste_poll(state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
   let keyboard = unsafe { &mut (*state).keyboard };
-  keyboard.update_keys();
+  keyboard.borrow_mut().update_keys();
   key_update(state);  
 }
 
 #[allow(unused)]
 unsafe fn characterization_test() {
-  let s = State::new(Box::new(|| (0x69, false)),
+  let k = Keyboard::new(Box::new(|| (0x69, false)));
+  let s = State::new(Rc::new(RefCell::new(k)),
                      Box::new(|interrupt| {
                        assert_eq!(interrupt, 0);
                      }));

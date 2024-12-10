@@ -13,7 +13,7 @@ const MAX_COL: u8 = 10;
 pub struct Keyboard {
   matrix: [u8; MAX_COL as usize],
   hack_key: Rc<Cell<(u8, bool)>>, // for callback
-  b_em: RefCell<B_em>,
+  pub b_em: Rc<RefCell<B_em>>,
 }
 
 impl Keyboard {
@@ -26,7 +26,7 @@ impl Keyboard {
     let press = hack_key.clone();
     // dummy, because we'll poke straight into bbcmatrix 
     let dummy_keypress = Box::new(move || { press.get() });
-    let b_em = RefCell::new(B_em::new(dummy_keypress));
+    let b_em = Rc::new(RefCell::new(B_em::new(dummy_keypress)));
     Keyboard { matrix: [0; MAX_COL as usize], hack_key, b_em }
   }
 
