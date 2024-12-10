@@ -308,3 +308,51 @@ fn test() {
   assert_eq!(has_irq.get(), false);
 }
 
+#[test]
+fn alt_via_timer1() {
+  let dummy = Keyboard::new(Box::new(||(0, false)));
+
+  let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
+  let has_irq_alias = has_irq.clone();
+  let interrupt = move |value| {
+    has_irq_alias.set(value != 0);
+  };
+
+  let via = Sysvia::new(Rc::new(RefCell::new(dummy)), Box::new(interrupt));
+  via.write(6, 0);
+  via.write(5, 0); // activate t1
+  via.step(200);
+  assert!(!has_irq.get());
+  assert_eq!(via.read(13), 1 << 6); // check IFR_T1_BIT
+  via.write(14, 0x80 | 1 << 6); // set IER_T1_BIT
+  assert!(has_irq.get());
+  via.write(13, 1 << 6); // clear IFR_T1_BIT
+
+  assert!(!has_irq.get());
+  via.write(6, 42); // T1L-low
+  // timer won't start till we write to T1 high latch
+  assert!(!has_irq.get());
+//assert_eq!(via.port_b.read(0), 0);
+  via.write(5, 0); // T1C-high, also T1L-low -> T1C-low
+  via.step(200); // + 200/2 = 100 ticks
+  assert!(has_irq.get());
+//assert_eq!(via.port_b.read(0), 0); // Auxiliary control bit 7 not set
+
+  // read clears interrupt
+  via.read(4); // T1C-low
+
+  assert!(!has_irq.get());
+
+  // ACR square wave on Port B bit 7
+  via.write(11, 1 << 7); // ACR_T1_PB7_BIT
+  via.write(5, 1); // T1C-high; restart timer: 256 + 42
+  via.step(1); // half cycle undocumented in via.c
+  via.step(100);
+  assert_eq!(via.read(4), 248); // = 256 + 42 + 1 - 100
+  assert_eq!(via.read(5), 0);
+  assert!(!has_irq.get());
+  via.step(600);
+  assert!(has_irq.get());
+//assert_eq!(via.port_b.read(0), 0x80);
+}
+
