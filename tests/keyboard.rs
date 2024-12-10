@@ -40,11 +40,6 @@ fn interrogate_keyboard() {
   let mut mem = PageDispatcher::new(Box::new(ram));
   let mut sheila = SheilaPage::new(keyboard.clone());
   sheila.use_alt_system_via =  true;
-
-  // pre-condition: configure system VIA DDRB to IIIIOOOO, where O's map to ic32
-  let system_via_ddrb = Address::from(0xFE42);
-  mem.write(system_via_ddrb, 0b0000_1111); // lower nybble are output bits
-
   let irq_level = sheila.irq.clone();
   let cds = sheila.get_clocked_devices();
   fn step(cds: &ClockedDevices, cycles: u64) {
@@ -53,6 +48,14 @@ fn interrogate_keyboard() {
     }
   }
   mem.add_backend(SheilaPage::page(), Box::new(sheila));
+
+  // pre-condition: configure system VIA DDRB to IIIIOOOO, where O's map to ic32
+  let system_via_ddrb = Address::from(0xFE42);
+  mem.write(system_via_ddrb, 0b0000_1111); // lower nybble are output bits
+
+  // pre-condition: configure system VIA PCR to triger positive CA2 edge
+  let system_via_pcr = Address::from(0xFE4C);
+  mem.write(system_via_pcr, 0b0000_0100); // PCR2 = 1
 
   let mut cpu = CPU::new();
   cpu.irq_level = irq_level;
@@ -222,14 +225,17 @@ fn loop_keyboard() {
 
   // TODO: currently differences between control line -> IRQ mapping
 //sheila.use_alt_system_via =  true;
+  let irq_level = sheila.irq.clone();
+  let cds = sheila.get_clocked_devices();
+  mem.add_backend(SheilaPage::page(), Box::new(sheila));
 
   // pre-condition: configure system VIA DDRB to IIIIOOOO, where O's map to ic32
   let system_via_ddrb = Address::from(0xFE42);
   mem.write(system_via_ddrb, 0b0000_1111); // lower nybble are output bits
 
-  let irq_level = sheila.irq.clone();
-  let cds = sheila.get_clocked_devices();
-  mem.add_backend(SheilaPage::page(), Box::new(sheila));
+  // pre-condition: configure system VIA PCR to triger positive CA2 edge
+  let system_via_pcr = Address::from(0xFE4C);
+  mem.write(system_via_pcr, 0b0000_0100); // PCR2 = 1
 
   let mut cpu = CPU::new();
   cpu.irq_level = irq_level;
@@ -252,6 +258,7 @@ fn loop_keyboard() {
     }
   };
 
+  assert_eq!(mem.read(system_via_pcr), 0b0000_0100); // PCR2 = 1
   // 1. with no keys pressed
   loop_keyboard(&mut cpu, &mut mem);
   assert_eq!(cpu.registers.a, 0xFF);
@@ -277,5 +284,4 @@ fn loop_keyboard() {
   assert_eq!(cpu.registers.a, key_code_b);
   assert_eq!(cpu.registers.x, key_code_b & 0x0F);
 }
-
 

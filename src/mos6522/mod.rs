@@ -49,6 +49,20 @@ impl Device for UserVIA {
 }
 
 #[derive(Debug)]
+struct ActiveEdge<const PCR_OUTPUT_MASK: u8, const PCR_EDGE_MASK: u8>(bool);
+
+impl<const PCR_OUTPUT_MASK: u8, const PCR_EDGE_MASK: u8>
+                                  ActiveEdge<PCR_OUTPUT_MASK, PCR_EDGE_MASK> {
+  fn change(&mut self, level: bool, pcr: u8) -> bool {
+    if self.0 == level || pcr & PCR_OUTPUT_MASK != 0 {
+      return false;
+    }
+    self.0 = level;
+    level == (pcr & PCR_EDGE_MASK != 0)
+  }
+}
+
+#[derive(Debug)]
 pub struct VIA<PA: Port, PB: Port> {
   pub irq: Rc<Signal>,// shared, hard-wired to other IRQ sources for logic "OR"
 
@@ -65,6 +79,8 @@ pub struct VIA<PA: Port, PB: Port> {
   ier: u8,            // interrupt enable mask
 
   port_a: PA, port_b: PB,
+  ca1: ActiveEdge<0,           0b0000_0001>,
+  ca2: ActiveEdge<0b0000_1000, 0b0000_0100>,
   clock_ms: Cell<u64>,
   t1_active: Cell<bool>, t2_active: Cell<bool>,
 }
@@ -102,9 +118,11 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
       ifr: Cell::new(0), ier: 0,
 
       port_a, port_b,
+      ca1: ActiveEdge(false),
+      ca2: ActiveEdge(false),
       clock_ms: Cell::new(0),
       t1_active: Cell::new(false), 
-      t2_active: Cell::new(false), 
+      t2_active: Cell::new(false),
     }
   }
 
@@ -155,6 +173,28 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
       let value = self.port_b.read(!BIT7);
       let value = value ^ BIT7; // toggle PB7
       self.port_b.write(value, BIT7);
+    }
+  }
+
+  fn update_ca1(&mut self, level: bool) {
+    if self.ca1.change(level, self.pcr) {
+      if self.acr & Self::ACR_PA_LATCH_BIT != 0 {
+        // Read latch
+        self.iora = self.port_a.read(self.ddra);
+      }
+
+      self.set_ifr_bits(Self::IFR_CA1_BIT);
+
+      if self.pcr & 0b1100 == 0b1000 {
+        // Handshaking mode
+        self.update_ca2(true); // ?
+      }
+    }
+  }
+
+  fn update_ca2(&mut self, level: bool) {
+    if self.ca2.change(level, self.pcr) {
+      self.set_ifr_bits(Self::IFR_CA2_BIT);
     }
   }
 }
@@ -431,13 +471,8 @@ impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
     };
 
     let (ca1, ca2) = self.port_a.control();
-    if ca1 {
-      self.set_ifr_bits(Self::IFR_CA1_BIT);
-    }
-
-    if ca2 {
-      self.set_ifr_bits(Self::IFR_CA2_BIT);
-    }
+    self.update_ca1(ca1);
+    self.update_ca2(ca2);
 
     if self.t1_active.get() {
       if self.t1c <= ticks {
@@ -478,6 +513,7 @@ fn via_ca1() {
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
   assert!(!via.irq.sense());
+  via.write(Address::from(12), BIT7 | 0b000_0001); // PCR ca1 positive active edge
   via.write(Address::from(14), BIT7 | 1 << 1); // set IER_CA1_BIT
   assert!(!via.irq.sense()); // enabled, but CA1 not scanned yet
   via.step(1);
@@ -493,6 +529,7 @@ fn via_ca2() {
   let pb = BogusPort::<'B'>::new(0);
   let mut via = VIA::new(pa, pb);
   assert!(!via.irq.sense());
+  via.write(Address::from(12), BIT7 | 0b000_0100); // PCR ca2 positive active edge
   via.write(Address::from(14), BIT7 | 1 << 0); // set IER_CA2_BIT
   assert!(!via.irq.sense()); // enabled, but CA1 not scanned yet
   via.step(1);
@@ -503,7 +540,15 @@ fn via_ca2() {
   via.update_ifr_irq(); // re-evaluate IRQ
   assert!(!via.irq.sense());
 
-  via.step(2); // ca1 raises interrupt again
+  via.step(2); // ca1 does not raise interrupt again
+  assert!(!via.irq.sense());
+
+  via.port_a.0 = 0; // negative edge does not trigger
+  via.step(3);
+  assert!(!via.irq.sense());
+
+  via.port_a.0 = 2;
+  via.step(4); // ca1 raises interrupt again
   assert!(via.irq.sense());
 
   via.write(Address::from(1), 42); // clear by writing o ORA
