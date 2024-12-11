@@ -1,4 +1,4 @@
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Key::*, Window, WindowOptions};
 
 // MODE 4 Physical size in pixels
 const WIDTH: usize = 320;
@@ -71,7 +71,7 @@ impl Screen {
   pub fn get_keys(&self) -> Vec<u8> {
     let mut result = Vec::new();
     for key in self.window.get_keys().iter() {
-      result.push(*key as u8); // FIXME: need proper conversion to ASCII(?)
+      result.push(Self::key_to_ascii(*key));
     }
     result
   }
@@ -115,6 +115,24 @@ impl Screen {
   pub fn pixel(&mut self, x: usize, y: usize, c: u3) {
     assert!(c < 8);
     self.buffer[x + WIDTH * y] = Self::COLORS[c as usize];
+  }
+
+  fn key_to_ascii(key: Key) -> u8 {
+    if Key::A <= key && key <= Key::Z {
+      'A' as u8 + key as u8 - Key::A as u8
+    } else if Key::Key0 <= key && key <= Key9 {
+      '0' as u8 + key as u8 - Key::Key0 as u8
+    } else {
+      match key {
+        Key::Backslash => '\\' as u8,
+        Key::Slash => '/' as u8,
+        Key::Enter => '\n' as u8,
+        Key::Space => ' ' as u8,
+        Key::Tab =>   '\t' as u8,
+        // TODO: a lot
+        _ => unimplemented!("Unknown key: {key:?}"),
+      }
+    }
   }
 }
 

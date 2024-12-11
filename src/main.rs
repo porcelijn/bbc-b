@@ -68,16 +68,20 @@ fn main() {
 
     if wait_a_while == 0 {
       wait_a_while = 100;
-      if let Some(key) = last_key {
-        keyboard.borrow_mut().release_key_ascii(key);
-      }
+      let new_key = screen.borrow().try_read();
+      if new_key != last_key {
+        if let Some(key) = last_key {
+          println!("Release '{}' ({key})", key as char);
+          keyboard.borrow_mut().release_key_ascii(key);
+        }
 
-      last_key = screen.borrow().try_read();
-
-      if let Some(key) = last_key {
-        keyboard.borrow_mut().press_key_ascii(key);
-        wait_a_while = 1000;
+        if let Some(key) = new_key {
+          println!("Press '{}' ({key})", key as char);
+          keyboard.borrow_mut().press_key_ascii(key);
+          wait_a_while = 1000;
+        }
       }
+      last_key = new_key;
     } else {
       wait_a_while -= 1;
     }
