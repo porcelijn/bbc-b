@@ -12,8 +12,9 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
   construction)
 * Snoop `OSWRCH` and pipe output to terminal — allows us to see what's going on
   despite lack of video circuit emulation
-* Quick 'n' dirty `MODE 4` frame buffer to see what's going on (do proper video
-  ULA and 6845 later)
+* Quick 'n' dirty `MODE 4` frame buffer, using
+  [minifb](https://docs.rs/crate/minifb/latest) to see what's going on (do
+  proper video ULA and 6845 later)
 ## todo
 * Instruction execution puts PC increment in wrong place
 * No timing or cycle counting whatsoever
