@@ -7,10 +7,11 @@ authors = [ "Porcelaine" ]
 [dependencies]
 log = "0.4"
 b-em-sysvia = { path = "crates/b-em-sysvia" }
+screen = { path = "crates/screen" }
 
 #[dev-dependencies]
 #simple_logger = "5.0.0"
 
 [workspace]
-members = [ "crates/b-em-sysvia" ]
+members = [ "crates/b-em-sysvia" , "crates/screen"]
 

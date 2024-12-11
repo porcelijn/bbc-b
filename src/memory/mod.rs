@@ -24,6 +24,7 @@ pub mod ram;
 pub trait MemoryBus {
   fn read(&self, address: Address) -> u8;
   fn write(&mut self, address: Address, value: u8);
+  fn try_slice(&self, _from: Address, _to: Address) -> Option<&[u8]> { None }
 }
 
 // Construct 16 bit Address from memory bytes in little endian order
@@ -121,6 +122,20 @@ impl MemoryBus for PageDispatcher {
     let backend_index = self.mapping[page as usize];
     let backend = &mut self.backends[backend_index as usize];
     backend.write(address, value);
+  }
+
+  fn try_slice(&self, from: Address, to: Address) -> Option<&[u8]> {
+    let page = from.hi_u8();
+    let backend_index = self.mapping[page as usize];
+    // TODO assert:assumption that pages are mapped contiguously in one backend
+    let backend = &self.backends[backend_index as usize];
+    backend.try_slice(from, to)
+  }
+}
+
+impl crate::devices::Device for PageDispatcher {
+  fn name(&self) -> &'static str {
+    "Page dispatcher"
   }
 }
 

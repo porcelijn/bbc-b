@@ -116,11 +116,16 @@ impl std::cmp::Ord for Address {
 
 impl MemoryBus for RAM {
   fn read(&self, address: Address) -> u8 {
-    self.0[address.to_u16()as usize]
+    self.0[address.to_u16() as usize]
   }
 
   fn write(&mut self, address: Address, value: u8) {
     self.0[address.to_u16() as usize] = value;
+  }
+
+  fn try_slice(&self, from: Address, to: Address) -> Option<&[u8]> {
+    let (from, to) = (from.to_u16(), to.to_u16());
+    Some(&self.0[from as usize .. to as usize])
   }
 }
 

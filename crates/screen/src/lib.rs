@@ -68,6 +68,14 @@ impl Screen {
     !self.window.is_open() || self.window.is_key_down(Key::Escape)
   }
 
+  pub fn get_keys(&self) -> Vec<u8> {
+    let mut result = Vec::new();
+    for key in self.window.get_keys().iter() {
+      result.push(*key as u8); // FIXME: need proper conversion to ASCII(?)
+    }
+    result
+  }
+
   pub fn show(&mut self) {
     // We unwrap here as we want this code to exit if it fails. Real
     // applications may want to handle this in a different way
