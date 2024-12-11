@@ -32,7 +32,7 @@ impl BufIter {
   const BASE_ADDRESS:  Address = Address::from(0x0300);
   const START_OFFSET:       u8 = 0xe0;
   const CAPACITY:           u8 = 32;
-//const EMPTY_FLAG:    Address = Address::from(0x02cf);
+  const EMPTY_FLAG:    Address = Address::from(0x02cf);
   const START_POINTER: Address = Address::from(0x02d8);
   const END_POINTER:   Address = Address::from(0x02e1);
 
@@ -44,9 +44,14 @@ impl BufIter {
     Self(memory.read(Self::END_POINTER))
   }
 
+  fn empty(memory: &dyn MemoryBus) -> bool {
+    memory.read(Self::EMPTY_FLAG) & 0b1000_0000 != 0
+  }
+
   fn size(memory: &dyn MemoryBus) -> u8 {
     Self::distance(Self::start(memory), Self::end(memory))
   }
+
   const fn distance(start: Self, end: Self) -> u8 {
     if start.0 <= end.0 {
       end.0 - start.0
@@ -77,7 +82,9 @@ impl BufIter {
 fn dump_keyboard_buffer(memory: &dyn MemoryBus) {
   let mut first = BufIter::start(memory);
   let last = BufIter::end(memory);
-  print!("keyboard buffer: {}", BufIter::size(memory));
+  let empty = BufIter::empty(memory);
+  let size = BufIter::size(memory);
+  print!("keyboard buffer, empty={empty}, size={size}:");
   while first != last {
     let value = memory.read(first.address());
     print!(" '{}' ({value}),", value as char);
@@ -93,6 +100,7 @@ fn insert_keyboard_buffer(memory: &mut dyn MemoryBus, value: u8) {
   last.next();
   assert!(last != first);
   last.save_end(memory);
+  memory.write(BufIter::EMPTY_FLAG, 0);
 }
 
 fn main() {
