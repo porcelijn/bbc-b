@@ -6,7 +6,7 @@ use bbc_b::mos6502::{CPU, stop_at};
 use bbc_b::devices::{ClockedDevices, DevicePage, SheilaPage};
 use bbc_b::devices::keyboard::Keyboard;
 use bbc_b::host::Screen;
-use bbc_b::memory::{Address, PageDispatcher, read_address};
+use bbc_b::memory::{Address, MemoryBus, PageDispatcher, read_address};
 use bbc_b::memory::ram::RAM;
 
 fn vdu_to_terminal(a_register: u8) {
@@ -22,6 +22,77 @@ fn vdu_to_terminal(a_register: u8) {
     // for now, ignore multitude of control codes
     _ => {},
   }
+}
+
+#[derive(PartialEq)]
+struct BufIter(u8); // X register
+
+impl BufIter {
+  // Keyboard buffer 3E0-3FF (32 bytes)
+  const BASE_ADDRESS:  Address = Address::from(0x0300);
+  const START_OFFSET:       u8 = 0xe0;
+  const CAPACITY:           u8 = 32;
+//const EMPTY_FLAG:    Address = Address::from(0x02cf);
+  const START_POINTER: Address = Address::from(0x02d8);
+  const END_POINTER:   Address = Address::from(0x02e1);
+
+  fn start(memory: &dyn MemoryBus) -> Self {
+    Self(memory.read(Self::START_POINTER))
+  }
+
+  fn end(memory: &dyn MemoryBus) -> Self {
+    Self(memory.read(Self::END_POINTER))
+  }
+
+  fn size(memory: &dyn MemoryBus) -> u8 {
+    Self::distance(Self::start(memory), Self::end(memory))
+  }
+  const fn distance(start: Self, end: Self) -> u8 {
+    if start.0 <= end.0 {
+      end.0 - start.0
+    } else {
+      Self::CAPACITY - (start.0 - end.0)
+    }
+  }
+
+  fn address(&self) -> Address {
+    let mut address = Self::BASE_ADDRESS;
+    address.inc_by(self.0);
+    address
+  }
+
+  fn next(&mut self) {
+    if self.0 == 0xFF {
+      self.0 = Self::START_OFFSET;
+    } else {
+      self.0 += 1;
+    }
+  }
+
+  fn save_end(&self, memory: &mut dyn MemoryBus) {
+    memory.write(Self::END_POINTER, self.0);
+  }
+}
+
+fn dump_keyboard_buffer(memory: &dyn MemoryBus) {
+  let mut first = BufIter::start(memory);
+  let last = BufIter::end(memory);
+  print!("keyboard buffer: {}", BufIter::size(memory));
+  while first != last {
+    let value = memory.read(first.address());
+    print!(" '{}' ({value}),", value as char);
+    first.next();
+  }
+  println!();
+}
+
+fn insert_keyboard_buffer(memory: &mut dyn MemoryBus, value: u8) {
+  let first = BufIter::start(memory);
+  let mut last = BufIter::end(memory);
+  memory.write(last.address(), value);
+  last.next();
+  assert!(last != first);
+  last.save_end(memory);
 }
 
 fn main() {
@@ -78,8 +149,11 @@ fn main() {
         if let Some(key) = new_key {
           println!("Press '{}' ({key})", key as char);
           keyboard.borrow_mut().press_key_ascii(key);
+          insert_keyboard_buffer(&mut *mem.borrow_mut(), key);
           wait_a_while = 1000;
         }
+
+        dump_keyboard_buffer(&*mem.borrow());
       }
       last_key = new_key;
     } else {
