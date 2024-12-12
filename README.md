@@ -15,6 +15,7 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 * Quick 'n' dirty `MODE 4` frame buffer, using
   [minifb](https://docs.rs/crate/minifb/latest) to see what's going on (do
   proper video ULA and 6845 later)
+* (Barely) `RUN`s a manually typed program in BBC BASIC 2!
 ## todo
 * Instruction execution puts PC increment in wrong place
 * No timing or cycle counting whatsoever

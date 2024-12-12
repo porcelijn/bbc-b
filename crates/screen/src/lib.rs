@@ -70,8 +70,15 @@ impl Screen {
 
   pub fn get_keys(&self) -> Vec<u8> {
     let mut result = Vec::new();
-    for key in self.window.get_keys().iter() {
-      result.push(Self::key_to_ascii(*key));
+    let mut keys: Vec<Key> = self.window.get_keys();
+    let mut shift = false;
+    let pred = |key: &Key| {
+      shift |= *key == Key::LeftShift || *key == RightShift;
+      *key != Key::LeftShift && *key != RightShift
+    };
+    keys = keys.into_iter().filter(pred).collect::<Vec<Key>>();
+    for key in keys.iter() {
+      result.push(Self::key_to_ascii(*key, shift));
     }
     result
   }
@@ -117,16 +124,46 @@ impl Screen {
     self.buffer[x + WIDTH * y] = Self::COLORS[c as usize];
   }
 
-  fn key_to_ascii(key: Key) -> u8 {
+  fn key_to_ascii(key: Key, shift: bool) -> u8 {
     if Key::A <= key && key <= Key::Z {
-      'A' as u8 + key as u8 - Key::A as u8
+      if shift {
+        'A' as u8 + key as u8 - Key::A as u8
+      } else {
+        'a' as u8 + key as u8 - Key::A as u8
+      }
     } else if Key::Key0 <= key && key <= Key9 {
-      '0' as u8 + key as u8 - Key::Key0 as u8
+      if shift {
+        match key {
+          Key::Key0 => ')' as u8,
+          Key::Key1 => '!' as u8,
+          Key::Key2 => '@' as u8,
+          Key::Key3 => '#' as u8,
+          Key::Key4 => '$' as u8,
+          Key::Key5 => '%' as u8,
+          Key::Key6 => '^' as u8,
+          Key::Key7 => '&' as u8,
+          Key::Key8 => '*' as u8,
+          Key::Key9 => '(' as u8,
+          _ => unreachable!(),
+        }
+      } else {
+        '0' as u8 + key as u8 - Key::Key0 as u8
+      }
     } else {
       match key {
+        Key::Apostrophe => if shift { b'"' } else { b'\'' },
+        Key::Backquote => if shift { b'~' } else { b'`' },
         Key::Backslash => '\\' as u8,
-        Key::Slash => '/' as u8,
-        Key::Enter => '\n' as u8,
+        Key::Backspace => 127,
+        Key::Comma => if shift { b'<' } else { b',' },
+        Key::Delete => 127,
+        Key::Enter => b'\r',
+        Key::Equal => if shift { b'+' } else { b'=' },
+        Key::Escape => 27,
+        Key::Minus => if shift { b'_' } else { b'-' },
+        Key::Period => if shift { b'>' } else { b'.' },
+        Key::Semicolon => if shift { b':' } else { b';' },
+        Key::Slash => if shift { b'?' } else { b'/' },
         Key::Space => ' ' as u8,
         Key::Tab =>   '\t' as u8,
         // TODO: a lot

@@ -171,7 +171,7 @@ const fn ascii_to_key_code(ascii: char) -> (u8, bool) {
 }
 
 // translate lower case ASCII, upper case, 7 bit key code
-const ASCII_TO_KEY_CODE: [(char, char, u8); 51] = [
+const ASCII_TO_KEY_CODE: [(char, char, u8); 53] = [
     ( ' ',  ' ',  0x62 ), // SPACE
     ( '\t', '\t', 0x60 ), // TAB
     ( '\n', '\r', 0x49 ), // Newline / RETURN
@@ -223,6 +223,8 @@ const ASCII_TO_KEY_CODE: [(char, char, u8); 51] = [
     ( 'x',  'X',  0x42 ),
     ( 'y',  'Y',  0x44 ),
     ( 'z',  'Z',  0x61 ),
+    ( '\x7f','\x7f',0x59), // Delete
+    ( '\x1b','\x1b',0x70), // Escape
 
 /* TODO:
     (  'Shift Lock',  0x50 ),
