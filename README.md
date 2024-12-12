@@ -41,7 +41,7 @@ mysterious 16 bytes:
 
 Emulating Mode 0, 3, or 4 monochrome graphics, this looks like `TT`:
 
-![Screenshot-2024-11-09](https://github.com/user-attachments/assets/7159f916-6cf3-4d72-bda9-4e6889c4789a)
+![Screenshot-2024-11-09](screenshots/2024-11-09.png)
 
 ---
 Progress: after clearing the SHEILA page (all zeroes; RAM rather than mapped
@@ -74,7 +74,7 @@ Added interception of calls to `OSWRCH`, forwarding `A` register (character to
 write) to standard out. No working keyboard yet, but this should simplify
 interactive debugging and regression tests.
 
-![Screenshot-24-11-21](https://github.com/user-attachments/assets/ea84a206-f68b-4dc0-b3d8-1f5de787584f)
+![Screenshot-24-11-21](screenshots/2024-11-21.png)
 
 ...And after adding stuffing the Basic ROM at `0x8000`, the `Language?` error disappears as well:
 
@@ -97,3 +97,11 @@ BASIC
 >█
 ```
 Still no keyboard, though :-(
+
+If finally managed to force my key presses into the machine, by passing all of
+the system VIA, hardware emulation. For now, I'm pushing input into the MOS
+keyboard buffer (`03E0..03FF`). This works if I manage to pop the `F10` key
+that the OS pushes initially during reset (not sure why that's never picked up).
+
+![Screenshot-24-11-21](screenshots/2024-12-12.png)
+
