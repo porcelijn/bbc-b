@@ -161,6 +161,15 @@ impl Screen {
 }
 
 type Palette = [u32; 16];
+const fn make_palette2(color0: u32, color1: u32) -> Palette {
+  let mut palette = [color0; 16];
+  let mut index = 8;
+  while index != 16 {
+    palette[index] = color1;
+    index += 1;
+  }
+  palette
+}
 
 struct PixelIter {
   byte: u8,
@@ -168,24 +177,7 @@ struct PixelIter {
 }
 
 impl PixelIter {
-  const PALETTE: Palette = [
-    Screen::BLUE >> 2, // looks better than black
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::BLUE >> 2,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::WHITE,
-    Screen::YELLOW,    // ARTIFACT
-  ];
+  const PALETTE: Palette = make_palette2(Screen::BLACK, Screen::WHITE);
 
   fn new(byte: u8) -> Self {
     PixelIter { byte, count: 8 }
