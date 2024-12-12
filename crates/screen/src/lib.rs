@@ -101,27 +101,14 @@ impl Screen {
         assert!((x * 8 + (y % 8) + (y / 8) * WIDTH) < WIDTH * HEIGHT); 
         assert_eq!(source, x * 8 + (y % 8) + (y / 8) * WIDTH); 
         assert_eq!(target, x * 8 + y * WIDTH);
-        let mut byte = video_ram[source];
-        for _ in 0..8 {
-          let color = if 0b1000_0000 & byte == 0 {
-            Self::BLUE >> 2 // looks better than black
-          } else {
-            Self::WHITE
-          };
-
+        let byte = video_ram[source];
+        for color in PixelIter::new(byte) {
           self.buffer[target] = color;
-
-          byte <<= 1;
           target += 1;
         }
         source += 8;
       }
     }
-  }
-
-  pub fn pixel(&mut self, x: usize, y: usize, c: u3) {
-    assert!(c < 8);
-    self.buffer[x + WIDTH * y] = Self::COLORS[c as usize];
   }
 
   fn key_to_ascii(key: Key, shift: bool) -> u8 {
@@ -169,6 +156,36 @@ impl Screen {
         // TODO: a lot
         _ => unimplemented!("Unknown key: {key:?}"),
       }
+    }
+  }
+}
+
+struct PixelIter {
+  byte: u8,
+  count: u8,
+}
+
+impl PixelIter {
+  fn new(byte: u8) -> Self {
+    PixelIter { byte, count: 8 }
+  }
+}
+
+impl Iterator for PixelIter {
+  type Item = u32;
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.count != 0 {
+      let color = if 0b1000_0000 & self.byte == 0 {
+        Screen::BLUE >> 2 // looks better than black
+      } else {
+        Screen::WHITE
+      };
+
+      self.count -= 1;
+      self.byte <<= 1;
+      Some(color)
+    } else {
+      None
     }
   }
 }
