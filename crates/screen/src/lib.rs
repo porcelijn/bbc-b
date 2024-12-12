@@ -160,15 +160,29 @@ impl Screen {
   }
 }
 
+type Palette = [u32; 16];
+
 struct PixelIter {
   byte: u8,
   count: u8,
 }
 
 impl PixelIter {
-  const PALETTE: [ u32; 4] = [
+  const PALETTE: Palette = [
     Screen::BLUE >> 2, // looks better than black
     Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::BLUE >> 2,
+    Screen::WHITE,
+    Screen::WHITE,
+    Screen::WHITE,
+    Screen::WHITE,
+    Screen::WHITE,
+    Screen::WHITE,
     Screen::WHITE,
     Screen::YELLOW,    // ARTIFACT
   ];
@@ -185,13 +199,18 @@ impl Iterator for PixelIter {
     if self.count != 0 {
       let a3 = 0b1000_0000 & self.byte != 0;
       let a2 = 0b0010_0000 & self.byte != 0;
-      let _a1 = 0b0000_1000 & self.byte != 0;
-      let _a0 = 0b0000_0010 & self.byte != 0;
-      let color = Self::PALETTE[2*a3 as usize | a2 as usize];
+      let a1 = 0b0000_1000 & self.byte != 0;
+      let a0 = 0b0000_0010 & self.byte != 0;
+      let mut logical: usize = 0;
+      if a0 { logical |= 0b0001 }
+      if a1 { logical |= 0b0010 }
+      if a2 { logical |= 0b0100 }
+      if a3 { logical |= 0b1000 }
+      let physical = Self::PALETTE[logical];
       self.byte <<= 1;
       self.byte |= 1;
       self.count -= 1;
-      Some(color)
+      Some(physical)
     } else {
       None
     }

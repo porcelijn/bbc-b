@@ -105,6 +105,7 @@ fn insert_keyboard_buffer(memory: &mut dyn MemoryBus, value: u8) {
     assert_eq!(value, memory.read(ASCII_ESCAPE_ACTION));
     println!("ESCAPEFLAG was: {}", memory.read(ESCAPE_FLAG));
     memory.write(ESCAPE_FLAG, 0x80);
+    return;
   }
   let first = BufIter::start(memory);
   let mut last = BufIter::end(memory);
@@ -171,6 +172,9 @@ fn main() {
       cd.borrow_mut().step(cpu.cycles);
     }
 
+    if cpu.registers.p.has::<'I'>() {
+      continue;
+    }
     if wait_a_while == 0 {
       wait_a_while = 100;
       let new_key = screen.borrow().try_read();
@@ -184,12 +188,12 @@ fn main() {
         }
         if let Some(key) = last_key {
           println!("Release '{}' ({key})", key as char);
-          keyboard.borrow_mut().release_key_ascii(key);
+         // keyboard.borrow_mut().release_key_ascii(key);
         }
 
         if let Some(key) = new_key {
           println!("Press '{}' ({key})", key as char);
-          keyboard.borrow_mut().press_key_ascii(key);
+       //   keyboard.borrow_mut().press_key_ascii(key);
           insert_keyboard_buffer(&mut *mem.borrow_mut(), key);
           wait_a_while = 1000;
         }
