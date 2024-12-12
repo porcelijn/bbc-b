@@ -166,9 +166,11 @@ struct PixelIter {
 }
 
 impl PixelIter {
-  const PALETTE: [ u32; 2] = [
+  const PALETTE: [ u32; 4] = [
     Screen::BLUE >> 2, // looks better than black
+    Screen::BLUE >> 2,
     Screen::WHITE,
+    Screen::YELLOW,    // ARTIFACT
   ];
 
   fn new(byte: u8) -> Self {
@@ -182,7 +184,10 @@ impl Iterator for PixelIter {
   fn next(&mut self) -> Option<Self::Item> {
     if self.count != 0 {
       let a3 = 0b1000_0000 & self.byte != 0;
-      let color = Self::PALETTE[a3 as usize];
+      let a2 = 0b0010_0000 & self.byte != 0;
+      let _a1 = 0b0000_1000 & self.byte != 0;
+      let _a0 = 0b0000_0010 & self.byte != 0;
+      let color = Self::PALETTE[2*a3 as usize | a2 as usize];
       self.byte <<= 1;
       self.byte |= 1;
       self.count -= 1;
