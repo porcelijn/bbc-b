@@ -63,7 +63,7 @@ impl Screen {
   }
 
   pub fn blit(&mut self) {
-    let (from, to) = (Address::from(0x5800), Address::from(0x8000));
+    let (from, to) = (Address::from(0x3000), Address::from(0x8000));
     let memory = self.memory.borrow();
     let vram = memory.try_slice(from, to);
     let vram = vram.expect("Could not get VRAM slice");

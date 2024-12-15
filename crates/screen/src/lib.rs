@@ -4,7 +4,9 @@ use minifb::{Key, Key::*, Window, WindowOptions};
 const WIDTH: usize = 320;
 const HEIGHT: usize = 256;
 
-const COLUMNS: usize = WIDTH / 8; // 40
+//const PIXELS_PER_BYTE: usize = 8; // 40 (MODE 4, 5)
+const PIXELS_PER_BYTE: usize = 4; // 80 (MODE 1)
+const COLUMNS: usize = WIDTH / PIXELS_PER_BYTE;
 const _ROWS: usize = WIDTH / 8; // 32
 
 // 3 bit RGB color
@@ -104,20 +106,20 @@ impl Screen {
   pub fn blit(&mut self, video_ram: &[u8]) {
     for y in 0..HEIGHT {
       let mut target = y * WIDTH;
-      let mut source = (y % 8) + (y / 8) * WIDTH;
+      let mut source = (y % 8) + (y / 8) * WIDTH * 8 / PIXELS_PER_BYTE;
       for x in 0..(COLUMNS) {
         assert!(y < HEIGHT);
-        assert!(x * 8 < WIDTH);
+        assert!(x * PIXELS_PER_BYTE < WIDTH);
         assert!((x * 8 + (y % 8) + (y / 8) * WIDTH) < WIDTH * HEIGHT); 
-        assert_eq!(source, x * 8 + (y % 8) + (y / 8) * WIDTH); 
-        assert_eq!(target, x * 8 + y * WIDTH);
+        assert_eq!(source, x * 8 + (y % 8) + (y / 8) * WIDTH * 8 / PIXELS_PER_BYTE); 
+        assert_eq!(target, x * PIXELS_PER_BYTE + y * WIDTH);
         let byte = video_ram[source];
-        for color in PixelIter::new(byte, 4) {
+        for color in PixelIter::new(byte, PIXELS_PER_BYTE as u8) {
           let color = Self::PALETTE[color as usize];
           self.buffer[target] = color;
           target += 1;
-          self.buffer[target] = color;
-          target += 1;
+      //  self.buffer[target] = color; // MODE 5
+      //  target += 1;
         }
         source += 8;
       }
