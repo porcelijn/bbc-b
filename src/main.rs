@@ -140,8 +140,9 @@ fn main() {
   assert_eq!(read_address(&ram, irq_vector).to_u16(), 0xDC1C); // as per MOS
   let mut mem = PageDispatcher::new(Box::new(ram));
   let mut keyboard = Keyboard::new();
-  // start in MODE 4. lower 3 bits reflect mode, inverted
-  keyboard.set_dip_switch(0b0000_0011);
+  // start in MODE 5. lower 3 bits reflect mode, inverted
+//keyboard.set_dip_switch(0b0000_0011); // MODE 4, monochrome
+  keyboard.set_dip_switch(0b0000_0010); // MODE 5, 4 colours
   let keyboard = Rc::new(RefCell::new(keyboard));
   let mut sheila = SheilaPage::new(keyboard.clone());
   sheila.use_alt_system_via = false;//true;

@@ -10,6 +10,11 @@ const _ROWS: usize = WIDTH / 8; // 32
 // 3 bit RGB color
 #[allow(non_camel_case_types)]
 type u3 = u8;
+
+// 4 bit colour address or F-R-G-B
+#[allow(non_camel_case_types)]
+type u4 = u8;
+
 type Buffer =[u32; WIDTH * HEIGHT]; // 24 bits RGB
 
 pub struct Screen {
@@ -51,6 +56,11 @@ impl Screen {
     Self::YELLOW,
     Self::WHITE,
   ];
+
+  const MONOCHROME: [u32; 2] = [Screen::BLACK, Screen::WHITE];
+  const FOURCOLORS: [u32; 4] =
+    [Screen::BLACK, Screen::RED, Screen::YELLOW, Screen::WHITE];
+  const PALETTE: Palette = make_palette(&Self::FOURCOLORS);
 
   pub fn new(title: &str) -> Self {
     let mut window_options = WindowOptions::default();
@@ -102,7 +112,10 @@ impl Screen {
         assert_eq!(source, x * 8 + (y % 8) + (y / 8) * WIDTH); 
         assert_eq!(target, x * 8 + y * WIDTH);
         let byte = video_ram[source];
-        for color in PixelIter::new(byte) {
+        for color in PixelIter::new(byte, 4) {
+          let color = Self::PALETTE[color as usize];
+          self.buffer[target] = color;
+          target += 1;
           self.buffer[target] = color;
           target += 1;
         }
@@ -161,11 +174,20 @@ impl Screen {
 }
 
 type Palette = [u32; 16];
-const fn make_palette2(color0: u32, color1: u32) -> Palette {
-  let mut palette = [color0; 16];
-  let mut index = 8;
+const fn make_palette(colors: &[u32]) -> Palette {
+  let len = colors.len();
+  assert!(len == 2 || len == 4 || len == 8);
+  let step = 8 / len;
+  let mut palette = [colors[0]; 16];
+  let mut index = step;
   while index != 16 {
-    palette[index] = color1;
+    let color = match len {
+      2 =>  (0b1000 & index) >> 3,
+      4 => ((0b1000 & index) >> 2) | ((0b0010 & index)>>1),
+      8 =>  (0b1110 & index) >> 1,
+      _ => panic!("Invalid colors, len must be 2, 4, or 8"),
+    };
+    palette[index] = colors[color as usize];
     index += 1;
   }
   palette
@@ -173,36 +195,43 @@ const fn make_palette2(color0: u32, color1: u32) -> Palette {
 
 struct PixelIter {
   byte: u8,
-  count: u8,
+  count: u8, // shift count down: 8 (monochrome), 4 (MODE 1, 5) or 2 (16 colors)
 }
 
 impl PixelIter {
-  const PALETTE: Palette = make_palette2(Screen::BLACK, Screen::WHITE);
+  const fn new(byte: u8, count: u8) -> Self {
+    assert!(count == 2 || count == 4 || count == 8);
+    PixelIter { byte, count }
+  }
 
-  fn new(byte: u8) -> Self {
-    PixelIter { byte, count: 8 }
+  // the shifted byte mask maps:
+  //   b7 b6 b5 b4 b3 b2 b1 b0
+  //   a3    a2    a1    a0
+  // lines a0-3 are address lines to 64 bit (4x4) palette register
+  fn u8_to_u4(mask: u8) -> u4 {
+    let a3 = 0b1000_0000 & mask != 0;
+    let a2 = 0b0010_0000 & mask != 0;
+    let a1 = 0b0000_1000 & mask != 0;
+    let a0 = 0b0000_0010 & mask != 0;
+    let mut address: u8 = 0;
+    if a0 { address |= 0b0001 }
+    if a1 { address |= 0b0010 }
+    if a2 { address |= 0b0100 }
+    if a3 { address |= 0b1000 }
+    address
   }
 }
 
 impl Iterator for PixelIter {
-  type Item = u32;
+  type Item = u4;
 
   fn next(&mut self) -> Option<Self::Item> {
     if self.count != 0 {
-      let a3 = 0b1000_0000 & self.byte != 0;
-      let a2 = 0b0010_0000 & self.byte != 0;
-      let a1 = 0b0000_1000 & self.byte != 0;
-      let a0 = 0b0000_0010 & self.byte != 0;
-      let mut logical: usize = 0;
-      if a0 { logical |= 0b0001 }
-      if a1 { logical |= 0b0010 }
-      if a2 { logical |= 0b0100 }
-      if a3 { logical |= 0b1000 }
-      let physical = Self::PALETTE[logical];
+      let address = Self::u8_to_u4(self.byte);
       self.byte <<= 1;
       self.byte |= 1;
       self.count -= 1;
-      Some(physical)
+      Some(address)
     } else {
       None
     }
