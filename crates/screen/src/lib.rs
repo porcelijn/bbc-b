@@ -4,9 +4,10 @@ use minifb::{Key, Key::*, Window, WindowOptions};
 const WIDTH: usize = 320;
 const HEIGHT: usize = 256;
 
-//const PIXELS_PER_BYTE: usize = 8; // 40 (MODE 4, 5)
-const PIXELS_PER_BYTE: usize = 4; // 80 (MODE 1)
-const COLUMNS: usize = WIDTH / PIXELS_PER_BYTE;
+//const PIXELS_PER_BYTE: usize = 8; // MODE 4
+//const PIXELS_PER_BYTE: usize = 4; // MODE 1, 5
+const PIXELS_PER_BYTE: usize = 2;   // MODE 2
+const COLUMNS: usize = 80; //WIDTH / PIXELS_PER_BYTE;
 const _ROWS: usize = WIDTH / 8; // 32
 
 // 3 bit RGB color
@@ -62,7 +63,11 @@ impl Screen {
   const MONOCHROME: [u32; 2] = [Screen::BLACK, Screen::WHITE];
   const FOURCOLORS: [u32; 4] =
     [Screen::BLACK, Screen::RED, Screen::YELLOW, Screen::WHITE];
-  const PALETTE: Palette = make_palette(&Self::FOURCOLORS);
+  const ALL_COLORS: [u32; 8] = [
+    Screen::BLACK, Screen::RED, Screen::GREEN, Screen::YELLOW,
+    Screen::BLUE, Screen::MAGENTA, Screen::CYAN, Screen::WHITE,
+  ];
+  const PALETTE: Palette = make_palette(&Self::ALL_COLORS);
 
   pub fn new(title: &str) -> Self {
     let mut window_options = WindowOptions::default();
@@ -106,20 +111,20 @@ impl Screen {
   pub fn blit(&mut self, video_ram: &[u8]) {
     for y in 0..HEIGHT {
       let mut target = y * WIDTH;
-      let mut source = (y % 8) + (y / 8) * WIDTH * 8 / PIXELS_PER_BYTE;
+      let mut source = (y % 8) + (y / 8) * COLUMNS * 8;
       for x in 0..(COLUMNS) {
         assert!(y < HEIGHT);
         assert!(x * PIXELS_PER_BYTE < WIDTH);
         assert!((x * 8 + (y % 8) + (y / 8) * WIDTH) < WIDTH * HEIGHT); 
-        assert_eq!(source, x * 8 + (y % 8) + (y / 8) * WIDTH * 8 / PIXELS_PER_BYTE); 
-        assert_eq!(target, x * PIXELS_PER_BYTE + y * WIDTH);
+        assert_eq!(source, x * 8 + (y % 8) + (y / 8) * COLUMNS * 8); 
+        assert_eq!(target, x * 2 * PIXELS_PER_BYTE + y * WIDTH);
         let byte = video_ram[source];
         for color in PixelIter::new(byte, PIXELS_PER_BYTE as u8) {
           let color = Self::PALETTE[color as usize];
           self.buffer[target] = color;
           target += 1;
-      //  self.buffer[target] = color; // MODE 5
-      //  target += 1;
+          self.buffer[target] = color; // MODE 5
+          target += 1;
         }
         source += 8;
       }
@@ -179,14 +184,13 @@ type Palette = [u32; 16];
 const fn make_palette(colors: &[u32]) -> Palette {
   let len = colors.len();
   assert!(len == 2 || len == 4 || len == 8);
-  let step = 8 / len;
   let mut palette = [colors[0]; 16];
-  let mut index = step;
+  let mut index = 1;
   while index != 16 {
     let color = match len {
       2 =>  (0b1000 & index) >> 3,
       4 => ((0b1000 & index) >> 2) | ((0b0010 & index)>>1),
-      8 =>  (0b1110 & index) >> 1,
+      8 =>  (0b0111 & index) >> 0,
       _ => panic!("Invalid colors, len must be 2, 4, or 8"),
     };
     palette[index] = colors[color as usize];
