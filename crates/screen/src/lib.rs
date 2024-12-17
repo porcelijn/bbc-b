@@ -1,17 +1,12 @@
 use minifb::{Key, Key::*, Window, WindowOptions};
 
-const MODE: u8 = 2;
+const MODE: u8 = 5;
 
 // MODE 1 / 4 Physical size in pixels
 const WIDTH: usize = 320;
 const HEIGHT: usize = 256;
-
-//const PIXEL_WIDTH: usize = ½; ??? TODO MODE 0, 3
-//const PIXEL_WIDTH: usize = 1; // MODE 1, 4
-const PIXEL_WIDTH: usize = 2; // MODE 2, 5
-//const PIXELS_PER_BYTE: usize = 8; // MODE 0, 4: monochrome
-//const PIXELS_PER_BYTE: usize = 4; // MODE 1, 5: 4 colours
-const PIXELS_PER_BYTE: usize = 2;   // MODE 2: full "16" colours
+const PIXEL_WIDTH: usize = get_pixel_width(MODE);
+const PIXELS_PER_BYTE: usize = get_pixels_per_byte(MODE);
 const COLUMNS: usize = WIDTH / PIXELS_PER_BYTE / PIXEL_WIDTH;
 const _ROWS: usize = WIDTH / 8; // 32
 
@@ -193,6 +188,24 @@ impl Screen {
         _ => unimplemented!("Unknown key: {key:?}"),
       }
     }
+  }
+}
+
+const fn get_pixel_width(mode: u8) -> usize {
+  match mode {
+//  0 | 3     => ½, // ??? TODO MODE 0, 3
+    1 | 4 | 6 => 1,
+    2 | 5     => 2,
+    _         => panic!("MODE not implemented"),
+  }
+}
+
+const fn get_pixels_per_byte(mode: u8) -> usize {
+  match mode {
+    0 | 3 | 4 | 6 => 8, // monochrome
+    1 | 5         => 4, // 4 colours
+    2             => 2, // MODE 2: full "16" colours
+    _         => panic!("MODE not implemented"),
   }
 }
 

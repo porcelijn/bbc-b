@@ -63,7 +63,13 @@ impl Screen {
   }
 
   pub fn blit(&mut self) {
-    let (from, to) = (Address::from(0x3000), Address::from(0x8000));
+// FIXME: let 6845 decide which memory to read
+//  let startup_options = Address::from(0x028F);
+//  let vdu_current_screen_mode = Address::from(0x0355);
+    let vdu_start_screen_address_high_byte = Address::from(0x034E);
+    let start_hi = self.memory.borrow().read(vdu_start_screen_address_high_byte);
+    let from = Address::from_le_bytes(0, start_hi);
+    let to = Address::from(0x8000);
     let memory = self.memory.borrow();
     let vram = memory.try_slice(from, to);
     let vram = vram.expect("Could not get VRAM slice");
