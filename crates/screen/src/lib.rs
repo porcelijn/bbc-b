@@ -1,13 +1,18 @@
 use minifb::{Key, Key::*, Window, WindowOptions};
 
-// MODE 4 Physical size in pixels
+const MODE: u8 = 2;
+
+// MODE 1 / 4 Physical size in pixels
 const WIDTH: usize = 320;
 const HEIGHT: usize = 256;
 
-//const PIXELS_PER_BYTE: usize = 8; // MODE 4
-//const PIXELS_PER_BYTE: usize = 4; // MODE 1, 5
-const PIXELS_PER_BYTE: usize = 2;   // MODE 2
-const COLUMNS: usize = 80; //WIDTH / PIXELS_PER_BYTE;
+//const PIXEL_WIDTH: usize = ½; ??? TODO MODE 0, 3
+//const PIXEL_WIDTH: usize = 1; // MODE 1, 4
+const PIXEL_WIDTH: usize = 2; // MODE 2, 5
+//const PIXELS_PER_BYTE: usize = 8; // MODE 0, 4: monochrome
+//const PIXELS_PER_BYTE: usize = 4; // MODE 1, 5: 4 colours
+const PIXELS_PER_BYTE: usize = 2;   // MODE 2: full "16" colours
+const COLUMNS: usize = WIDTH / PIXELS_PER_BYTE / PIXEL_WIDTH;
 const _ROWS: usize = WIDTH / 8; // 32
 
 // 3 bit RGB color
@@ -61,13 +66,24 @@ impl Screen {
   ];
 
   const MONOCHROME: [u32; 2] = [Screen::BLACK, Screen::WHITE];
-  const FOURCOLORS: [u32; 4] =
-    [Screen::BLACK, Screen::RED, Screen::YELLOW, Screen::WHITE];
+  const FOURCOLORS: [u32; 4] = [
+    Screen::BLACK, Screen::RED, Screen::YELLOW, Screen::WHITE
+  ];
   const ALL_COLORS: [u32; 8] = [
     Screen::BLACK, Screen::RED, Screen::GREEN, Screen::YELLOW,
     Screen::BLUE, Screen::MAGENTA, Screen::CYAN, Screen::WHITE,
   ];
-  const PALETTE: Palette = make_palette(&Self::ALL_COLORS);
+
+  const fn get_colors(mode: u8) -> &'static [u32] {
+    match mode {
+      0 | 3 | 4 | 6 => &Self::MONOCHROME,
+      1 | 5         => &Self::FOURCOLORS,
+      2             => &Self::ALL_COLORS,
+      _             => panic!("MODE not implemented"),
+    }
+  }
+
+  const PALETTE: Palette = make_palette(Self::get_colors(MODE));
 
   pub fn new(title: &str) -> Self {
     let mut window_options = WindowOptions::default();
@@ -117,14 +133,14 @@ impl Screen {
         assert!(x * PIXELS_PER_BYTE < WIDTH);
         assert!((x * 8 + (y % 8) + (y / 8) * WIDTH) < WIDTH * HEIGHT); 
         assert_eq!(source, x * 8 + (y % 8) + (y / 8) * COLUMNS * 8); 
-        assert_eq!(target, x * 2 * PIXELS_PER_BYTE + y * WIDTH);
+        assert_eq!(target, x * PIXELS_PER_BYTE * PIXEL_WIDTH + y * WIDTH);
         let byte = video_ram[source];
         for color in PixelIter::new(byte, PIXELS_PER_BYTE as u8) {
           let color = Self::PALETTE[color as usize];
-          self.buffer[target] = color;
-          target += 1;
-          self.buffer[target] = color; // MODE 5
-          target += 1;
+          for _ in 0..PIXEL_WIDTH {
+            self.buffer[target] = color;
+            target += 1;
+          }
         }
         source += 8;
       }
