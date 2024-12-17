@@ -74,7 +74,7 @@ Added interception of calls to `OSWRCH`, forwarding `A` register (character to
 write) to standard out. No working keyboard yet, but this should simplify
 interactive debugging and regression tests.
 
-![Screenshot-24-11-21](screenshots/2024-11-21.png)
+![Screenshot 2024-11-21](screenshots/2024-11-21.png)
 
 ...And after adding stuffing the Basic ROM at `0x8000`, the `Language?` error disappears as well:
 
@@ -103,5 +103,9 @@ the system VIA, hardware emulation. For now, I'm pushing input into the MOS
 keyboard buffer (`03E0..03FF`). This works if I manage to pop the `F10` key
 that the OS pushes initially during reset (not sure why that's never picked up).
 
-![Screenshot-24-11-21](screenshots/2024-12-12.png)
+![Screenshot 2024/12/12](screenshots/2024-12-12.png)
 
+I might have an idea about why the keyboard often seems to crash the emulator.
+But for now, I seem to have MODE 2 with 8 colours:
+
+![Screenshot 2024/12/17](screenshots/2024-12-17.png)

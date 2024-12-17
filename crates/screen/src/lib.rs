@@ -1,6 +1,6 @@
 use minifb::{Key, Key::*, Window, WindowOptions};
 
-const MODE: u8 = 5;
+const MODE: u8 = 2;
 
 // MODE 1 / 4 Physical size in pixels
 const WIDTH: usize = 320;

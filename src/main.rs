@@ -144,7 +144,7 @@ fn main() {
 //keyboard.set_dip_switch(0b0000_0011); // MODE 4, monochrome
   keyboard.set_dip_switch(0b0000_0010); // MODE 5, 4 colours
 //keyboard.set_dip_switch(0b0000_0110); // MODE 1, 4 colours
-//keyboard.set_dip_switch(0b0000_0101); // MODE 2, 16 colours
+  keyboard.set_dip_switch(0b0000_0101); // MODE 2, 16 colours
   let keyboard = Rc::new(RefCell::new(keyboard));
   let mut sheila = SheilaPage::new(keyboard.clone());
   sheila.use_alt_system_via = false;//true;
