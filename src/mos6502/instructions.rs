@@ -509,21 +509,48 @@ fn test_cmp() {
   // CMP #0 (with A=0): Carry is set if A greater than or EQUAL TO M
   compare::<'A', UseImmediate>(&mut regs, &mut mem);
   assert!(regs.p.has::<'Z'>());
+  assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>());
+  assert!(!regs.p.has::<'V'>());
 
   // CMP #0 (with A=1): Carry is set if A GREATER THAN or equal to M
   regs.a = 1;
   compare::<'A', UseImmediate>(&mut regs, &mut mem);
   assert!(!regs.p.has::<'Z'>());
+  assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>());
+  assert!(!regs.p.has::<'V'>());
 
   // CMP #2 (with A=1): Carry is clear when A less than M
   mem.write(regs.pc, 2);
   compare::<'A', UseImmediate>(&mut regs, &mut mem);
   assert!(!regs.p.has::<'Z'>());
+  assert!(regs.p.has::<'N'>());
   assert!(!regs.p.has::<'C'>());
 }
 
+#[test]
+fn test_cpx() {
+  use crate::memory::ram::RAM;
+  let mut regs = Registers::new();
+  let mut mem = RAM::new();
+ 
+  // with X=224, CPX #255 (wrap around) 224 <? 255 c.q. -96 <? -128
+  regs.x = 224;
+  mem.write(regs.pc, 255);
+  compare::<'X', UseImmediate>(&mut regs, &mut mem);
+  assert!(!regs.p.has::<'Z'>());
+  assert!(regs.p.has::<'N'>());
+  assert!(!regs.p.has::<'C'>()); // has borrow
+
+  // with X=255, CPX #224 (wrap around) 255 <? 224 c.q. -128 <? -96
+  regs.x = 255;
+  mem.write(regs.pc, 224);
+  compare::<'X', UseImmediate>(&mut regs, &mut mem);
+  assert!(!regs.p.has::<'Z'>());
+  assert!(!regs.p.has::<'N'>());
+  assert!(regs.p.has::<'C'>()); // no borrow
+}
 fn bit<AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   let value = AM::get_value(registers, memory);
   let status = alu::bit(registers.a, value, registers.p);
