@@ -527,6 +527,7 @@ fn test_cmp() {
   assert!(!regs.p.has::<'Z'>());
   assert!(regs.p.has::<'N'>());
   assert!(!regs.p.has::<'C'>());
+  assert!(regs.p.has::<'V'>());
 }
 
 #[test]
@@ -542,6 +543,7 @@ fn test_cpx() {
   assert!(!regs.p.has::<'Z'>());
   assert!(regs.p.has::<'N'>());
   assert!(!regs.p.has::<'C'>()); // has borrow
+  assert!(!regs.p.has::<'V'>());
 
   // with X=255, CPX #224 (wrap around) 255 <? 224 c.q. -128 <? -96
   regs.x = 255;
@@ -550,6 +552,7 @@ fn test_cpx() {
   assert!(!regs.p.has::<'Z'>());
   assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>()); // no borrow
+  assert!(regs.p.has::<'V'>());
 }
 fn bit<AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   let value = AM::get_value(registers, memory);
