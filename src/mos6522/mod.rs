@@ -478,9 +478,9 @@ impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
     fn expires(timer: u16, ticks: u16) -> bool {
       if 0xFFFE <= timer {
         // timer has wrapped
-        timer - ticks <= 0xFFFE
+        timer - ticks < 0xFFFE
       } else {
-        // experies 2 ticks after wrapping through 0
+        // expires 2 ticks after wrapping through 0
         timer + 2 < ticks
       }
     }
@@ -490,7 +490,7 @@ impl<PA: Port, PB: Port> Clocked for VIA<PA, PB> {
         self.set_ifr_bits(Self::IFR_T1_BIT);
         if self.acr & Self::ACR_T1_REPEAT_BIT != 0 {
           // free run
-          let difference = ticks + 2 - self.t1c.wrapping_add(2);
+          let difference = ticks - self.t1c.wrapping_add(2);
           assert!(difference <= self.t1l);
           self.t1c = self.t1l - difference;
         } else {

@@ -2,15 +2,28 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bbc_b::devices::{Clocked, Signal};
+use bbc_b::devices::ic32::IC32;
 use bbc_b::devices::keyboard::Keyboard;
 use bbc_b::memory::{Address, MemoryBus};
 use bbc_b::mos6522::alt_via::AltVIA;
+use bbc_b::mos6522::system_via::{SystemPortA, SystemPortB, SystemVIA};
 
 const T1C_H: Address = Address::from(5);
 const T1L_L: Address = Address::from(6);
 const ACR:   Address = Address::from(11);
 const IFR:   Address = Address::from(13);
 const IER:   Address = Address::from(14);
+
+#[test]
+fn timer1_100hz_mine() {
+  let keyboard = Rc::new(RefCell::new(Keyboard::new()));
+  let ic32 = Rc::new(IC32::new());
+  let port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
+  let port_b = SystemPortB::new(ic32.clone());
+  let mut via = SystemVIA::new(port_a, port_b);
+  let irq = via.irq.clone();
+  test_timer1_100hz(via, irq);
+}
 
 #[test]
 fn timer1_100hz_b_em() {
