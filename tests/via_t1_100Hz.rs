@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bbc_b::devices::Clocked;
+use bbc_b::devices::{Clocked, Signal};
 use bbc_b::devices::keyboard::Keyboard;
 use bbc_b::memory::{Address, MemoryBus};
 use bbc_b::mos6522::alt_via::AltVIA;
@@ -13,10 +13,14 @@ const IFR:   Address = Address::from(13);
 const IER:   Address = Address::from(14);
 
 #[test]
-fn timer1_100hz() {
+fn timer1_100hz_b_em() {
   let keyboard = Rc::new(RefCell::new(Keyboard::new()));
-  let mut via = AltVIA::new(keyboard.clone());
+  let via = AltVIA::new(keyboard.clone());
+  let irq = via.irq.clone();
+  test_timer1_100hz(via, irq);
+}
 
+fn test_timer1_100hz<VIA: MemoryBus + Clocked>(mut via: VIA, irq: Rc<Signal>) {
   via.write(ACR, 1 << 6); // set ACR_T1_REPEAT_BIT
   const BIT7: u8 = 1 << 7;
   via.write(IER, BIT7 | 1 << 6); // set IER_T1_BIT
@@ -30,39 +34,44 @@ fn timer1_100hz() {
 
   for us in 1..10000 {
     via.step(us);
-    assert!(!via.irq.sense());
+    assert!(!irq.sense());
+    assert_eq!(via.read(IFR), 0);
   }
 
   via.step(10000);
-  assert!(!via.irq.sense());
+  assert!(!irq.sense());
 
   via.step(10001);
-  assert!(via.irq.sense()); // <-- BOOM!
+  assert!(irq.sense()); // <-- BOOM!
+  assert_eq!(via.read(IFR), 0b1100_0000); // T1 = bit 6, IRQ = bit 7
 
   via.step(10002);
-  assert!(!via.irq.sense());
+  assert!(!irq.sense());
+  assert_eq!(via.read(IFR), 0b1100_0000); // still set
+  via.write(IFR, 0b0100_0000);            // clear it
+  assert_eq!(via.read(IFR), 0);           // cleared
 
   for us in 10003..20000 {
     via.step(us);
-    assert!(!via.irq.sense());
+    assert!(!irq.sense());
   }
 
   via.step(20000);
-  assert!(!via.irq.sense());
+  assert!(!irq.sense());
 
   via.step(20001);
-  assert!(via.irq.sense()); // <-- BOOM!
+  assert!(irq.sense()); // <-- BOOM!
 
   // etc.
   for us in 20002..=30000 {
     via.step(us);
-    assert!(!via.irq.sense());
+    assert!(!irq.sense());
   }
 
   via.step(30001);
-  assert!(via.irq.sense());
+  assert!(irq.sense());
 
   via.step(40001);
-  assert!(via.irq.sense());
+  assert!(irq.sense());
 }
 
