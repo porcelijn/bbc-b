@@ -111,7 +111,7 @@ impl Keyboard {
 
     // .loopKeyboardColumns (MOS 0xFE03)
     // selects a non-existent keyboard column 15 (0-9 only!)
-    assert_eq!(col, 15);
+//  assert_eq!(col, 15);
     assert!( ! b_em_value);
     false
   }

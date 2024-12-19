@@ -495,7 +495,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registe
 
   registers.p.set::<'C'>(carry);
   registers.p.set::<'N'>(negative);
-  registers.p.set::<'V'>(overflow);
+//registers.p.set::<'V'>(overflow); // V (overflow flag): not affected
   registers.p.set::<'Z'>(result == 0);
 
   registers.pc.inc_by(AM::get_size());
@@ -511,7 +511,7 @@ fn test_cmp() {
   assert!(regs.p.has::<'Z'>());
   assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>());
-  assert!(!regs.p.has::<'V'>());
+  assert!(!regs.p.has::<'V'>()); // not affected
 
   // CMP #0 (with A=1): Carry is set if A GREATER THAN or equal to M
   regs.a = 1;
@@ -519,7 +519,7 @@ fn test_cmp() {
   assert!(!regs.p.has::<'Z'>());
   assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>());
-  assert!(!regs.p.has::<'V'>());
+  assert!(!regs.p.has::<'V'>()); // not affected
 
   // CMP #2 (with A=1): Carry is clear when A less than M
   mem.write(regs.pc, 2);
@@ -527,7 +527,7 @@ fn test_cmp() {
   assert!(!regs.p.has::<'Z'>());
   assert!(regs.p.has::<'N'>());
   assert!(!regs.p.has::<'C'>());
-  assert!(regs.p.has::<'V'>());
+  assert!(!regs.p.has::<'V'>()); // not affected
 }
 
 #[test]
@@ -535,7 +535,9 @@ fn test_cpx() {
   use crate::memory::ram::RAM;
   let mut regs = Registers::new();
   let mut mem = RAM::new();
- 
+
+  regs.p.set_flag::<'V', true>(); // should NOT be affected
+
   // with X=224, CPX #255 (wrap around) 224 <? 255 c.q. -96 <? -128
   regs.x = 224;
   mem.write(regs.pc, 255);
@@ -543,7 +545,7 @@ fn test_cpx() {
   assert!(!regs.p.has::<'Z'>());
   assert!(regs.p.has::<'N'>());
   assert!(!regs.p.has::<'C'>()); // has borrow
-  assert!(!regs.p.has::<'V'>());
+  assert!(regs.p.has::<'V'>()); // not affected
 
   // with X=255, CPX #224 (wrap around) 255 <? 224 c.q. -128 <? -96
   regs.x = 255;
@@ -552,8 +554,9 @@ fn test_cpx() {
   assert!(!regs.p.has::<'Z'>());
   assert!(!regs.p.has::<'N'>());
   assert!(regs.p.has::<'C'>()); // no borrow
-  assert!(regs.p.has::<'V'>());
+  assert!(regs.p.has::<'V'>()); // not affected
 }
+
 fn bit<AM: UseMode + UseValue>(registers: &mut Registers, memory: &mut dyn MemoryBus) {
   let value = AM::get_value(registers, memory);
   let status = alu::bit(registers.a, value, registers.p);
