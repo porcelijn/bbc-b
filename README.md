@@ -86,6 +86,8 @@ BASIC
 
 █
 ```
+
+---
 BASIC writes the prompt character `>` by-passing the `OSWRCH` vector, so I'm
 intercepting `0xE0A4`, rather than `0xFFEE` to make that work:
 ```
@@ -98,14 +100,27 @@ BASIC
 ```
 Still no keyboard, though :-(
 
-If finally managed to force my key presses into the machine, by passing all of
+---
+I finally managed to force my key presses into the machine, by passing all of
 the system VIA, hardware emulation. For now, I'm pushing input into the MOS
 keyboard buffer (`03E0..03FF`). This works if I manage to pop the `F10` key
 that the OS pushes initially during reset (not sure why that's never picked up).
 
 ![Screenshot 2024/12/12](screenshots/2024-12-12.png)
 
+---
 I might have an idea about why the keyboard often seems to crash the emulator.
 But for now, I seem to have MODE 2 with 8 colours:
 
 ![Screenshot 2024/12/17](screenshots/2024-12-17.png)
+
+---
+Indeed: a subtle but fatal flaw in my implementation of 6502 `CMP` instruction
+was the cause of MOS keyboard routine's misbehaviour. Turns out I was dutifully
+updating the `V` (overflow flag) bit in `P` register resulting from subtraction.
+This is wrong as the *BBC Micro Advanced User Guide* documents that this bit is
+unaffected by a *compare*.
+
+`V` functions as a Boolean parameter to MOS' `REMV` to indicate that the buffer's
+current character must only be *examined* (rather than popped). So: nothing wrong
+with the system VIA; just some sloppy coding of the CPU.
