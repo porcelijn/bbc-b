@@ -34,7 +34,7 @@ impl Device for AltVIA {
 impl Clocked for AltVIA {
   fn step(&mut self, us: u64) {
     assert!(self.micros < us);
-    let ticks = us - self.micros;
+    let ticks = 2 * (us - self.micros); // B-em ticks are at 2MHz
     assert!(ticks < u32::MAX.into());
     self.via.step(ticks as u32);
     self.micros = us;
