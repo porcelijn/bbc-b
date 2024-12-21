@@ -489,13 +489,13 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(registers: &mut Registe
   let rhs = AM::get_value(registers, memory);
   const CARRY: bool = true;
 
-  let (result, carry, overflow) =
+  let (result, carry, _overflow) =
     alu::sub_with_carry(lhs, rhs, CARRY);
   let negative = result & 0b0_1000_0000 != 0;
 
   registers.p.set::<'C'>(carry);
   registers.p.set::<'N'>(negative);
-//registers.p.set::<'V'>(overflow); // V (overflow flag): not affected
+//registers.p.set::<'V'>(_overflow); // V (overflow flag): not affected
   registers.p.set::<'Z'>(result == 0);
 
   registers.pc.inc_by(AM::get_size());
