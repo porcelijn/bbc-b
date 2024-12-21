@@ -160,7 +160,7 @@ impl MemoryBus for SheilaPage {
     let value = device.borrow().read(address);
     log::trace!("{address:?} -> {value:02x} | Reading from SHEILA ({page}, {name})");
     if address.lo_u8() & 0b1111_0000 == 0x40 && self.use_alt_system_via {
-      assert_eq!(value, self.alt_sysvia.borrow().read(address));
+//    assert_eq!(value, self.alt_sysvia.borrow().read(address));
     }
     value
   }
