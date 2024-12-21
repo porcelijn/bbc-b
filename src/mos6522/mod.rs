@@ -212,16 +212,18 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         };
         self.clear_ifr_bits(bits);
 
-        let mut irb = self.iorb & self.ddrb; // read output bits
+        let mut ddrb = self.ddrb;
+        if self.acr & Self::ACR_T1_PB7_BIT != 0 {
+          ddrb &= NBIT7; // make sure B7 is input bit
+        }
+
+        let mut irb = self.iorb & ddrb; // read output bits
         if self.acr & Self::ACR_PB_LATCH_BIT != 0 {
           // read latch
-          irb |= self.iorb & !self.ddrb;
+          irb |= self.iorb & !ddrb;
         } else {
           // read current port values
-          irb |= self.port_b.read(self.ddrb);
-//        if self.acr & Self::ACR_T1_PB7_BIT != 0 {
-//          irb = (irb & 0b0111_1111) | self.t1pb7;
-//        }
+          irb |= self.port_b.read(ddrb);
         }
         log::trace!("read {address:?} IORB -> {irb:04x}");
         irb

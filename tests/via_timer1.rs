@@ -8,6 +8,8 @@ use bbc_b::memory::{Address, MemoryBus};
 use bbc_b::mos6522::alt_via::AltVIA;
 use bbc_b::mos6522::system_via::{SystemPortA, SystemPortB, SystemVIA};
 
+const IORB: Address = Address::from(0);
+const DDRB: Address = Address::from(2);
 const T1C_H: Address = Address::from(5);
 const T1L_L: Address = Address::from(6);
 const ACR:   Address = Address::from(11);
@@ -88,3 +90,47 @@ fn test_timer1_100hz<VIA: MemoryBus + Clocked>(mut via: VIA, irq: Rc<Signal>) {
   assert!(irq.sense());
 }
 
+#[test]
+fn timer1_b7_square_wave_mine() {
+  let keyboard = Rc::new(RefCell::new(Keyboard::new()));
+  let ic32 = Rc::new(IC32::new());
+  let port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
+  let port_b = SystemPortB::new(ic32.clone());
+  test_timer1_b7_square_wave(SystemVIA::new(port_a, port_b));
+}
+
+#[test]
+fn timer1_b7_square_wave_b_em() {
+  let keyboard = Rc::new(RefCell::new(Keyboard::new()));
+  test_timer1_b7_square_wave(AltVIA::new(keyboard));
+}
+
+fn test_timer1_b7_square_wave<VIA: MemoryBus + Clocked>(mut via: VIA) {
+  via.write(ACR, 0b1100_0000); // set T1 repeat + set B7 square wave bit
+  const BIT7: u8 = 1 << 7;
+  via.write(IER, BIT7 | 1 << 6); // set IER_T1_BIT
+  const TICKS_10KHZ: u16 = 98; // 100 @ 1MHz
+  via.write(T1L_L, (TICKS_10KHZ & 0xFF) as u8);
+  via.write(T1C_H, (TICKS_10KHZ >> 8) as u8); // activate t1
+
+  via.write(DDRB, 0b1111_1111);
+  via.write(IORB, 0b0011_1100); // Some random pattern
+  for us in 1..101 {
+    via.step(us);
+    assert_eq!(via.read(IORB), 0b0011_1100);
+  }
+  for us in 101..201 {
+    via.step(us);
+    assert_eq!(via.read(IORB), 0b1011_1100); // <-- B7 is set!
+  }
+  for us in 201..301 {
+    via.step(us);
+    assert_eq!(via.read(IORB), 0b0011_1100); // B7 is clear
+  }
+  for us in 301..401 {
+    via.step(us);
+    assert_eq!(via.read(IORB), 0b1011_1100); // B7 is set
+  }
+  via.step(401);
+  assert_eq!(via.read(IORB), 0b0011_1100); // B7 is clear
+}

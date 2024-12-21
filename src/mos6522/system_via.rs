@@ -126,7 +126,7 @@ impl Port for SystemPortB {
   }
 
   fn read(&self, ddr_mask: u8) -> u8 {
-    let mut result = 0xFF & !ddr_mask;
+    let mut result = self.pb & !ddr_mask;
     // PB4 and PB5: joystick buttons
     if self.joybuttons.0 { result &= !(1 << 4); } // PB4
     if self.joybuttons.1 { result &= !(1 << 5); } // PB5
