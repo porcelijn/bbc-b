@@ -103,6 +103,7 @@ unaffected by a *compare*.
 `V` functions as a Boolean parameter to MOS' `REMV` to indicate that the buffer's
 current character must only be *examined* (rather than popped). So: nothing wrong
 with the system VIA; just some sloppy coding of the CPU.
+
 ---
 2024-12-27 —
 Removed hacky keyboard emulation because it (mostly) works using the *minifb*
