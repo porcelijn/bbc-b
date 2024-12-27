@@ -31,3 +31,4 @@ Pet project to learn about 6502 CPU, Rust and BBC micro computer
 * Intent is not to keep it there permanently but to compare behaviour to my own
   implementation and hopefully manage to emulate a *working* keyboard that way
 
+![Screenshot 2024/12/17](screenshots/2024-12-27.png)
