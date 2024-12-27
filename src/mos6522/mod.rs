@@ -170,9 +170,10 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
 
   fn update_port_b7(&mut self) {
     if self.acr & Self::ACR_T1_PB7_BIT != 0 {
-      let value = self.port_b.read(!BIT7);
+      let value = self.iorb;
       let value = value ^ BIT7; // toggle PB7
       self.port_b.write(value, BIT7);
+      self.iorb = value;
     }
   }
 
@@ -212,18 +213,13 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         };
         self.clear_ifr_bits(bits);
 
-        let mut ddrb = self.ddrb;
-        if self.acr & Self::ACR_T1_PB7_BIT != 0 {
-          ddrb &= NBIT7; // make sure B7 is input bit
-        }
-
-        let mut irb = self.iorb & ddrb; // read output bits
+        let mut irb = self.iorb & self.ddrb; // read output bits
         if self.acr & Self::ACR_PB_LATCH_BIT != 0 {
           // read latch
-          irb |= self.iorb & !ddrb;
+          irb |= self.iorb & !self.ddrb;
         } else {
           // read current port values
-          irb |= self.port_b.read(ddrb);
+          irb |= self.port_b.read(self.ddrb);
         }
         log::trace!("read {address:?} IORB -> {irb:04x}");
         irb
@@ -379,6 +375,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         self.t1c = self.t1l;
         if self.acr & Self::ACR_T1_PB7_BIT != 0 {
           // one shot, pull PB7 low
+          self.iorb &= NBIT7;
           self.port_b.write(0, BIT7);
         }
         self.clear_ifr_bits(Self::IFR_T1_BIT);

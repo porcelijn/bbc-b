@@ -109,7 +109,7 @@ impl SheilaPage {
     system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
     let crtc = Rc::new(RefCell::new(crtc));
     let alt_sysvia = AltVIA::new(keyboard);
-    let irq = alt_sysvia.irq.clone();
+  let irq = alt_sysvia.irq.clone();
     let alt_sysvia = Rc::new(RefCell::new(alt_sysvia));
     let system_port_b = SystemPortB::new(ic32);
     let mut system_via = SystemVIA::new(system_port_a, system_port_b);
@@ -158,9 +158,9 @@ impl MemoryBus for SheilaPage {
     let device = self.get_device(address);
     let name = device.borrow().name();
     let value = device.borrow().read(address);
-    log::trace!("{address:?} -> {value:02x} | Reading from SHEILA ({page}, {name})");
+    log::trace!("{address:?} -> {value:02x} | Reading from SHEILA ({page:x}, {name})");
     if address.lo_u8() & 0b1111_0000 == 0x40 && self.use_alt_system_via {
-//    assert_eq!(value, self.alt_sysvia.borrow().read(address));
+      assert_eq!(value, self.alt_sysvia.borrow().read(address));
     }
     value
   }
@@ -169,7 +169,7 @@ impl MemoryBus for SheilaPage {
     let page = Self::page();
     let device = self.get_device(address);
     let name = device.borrow().name();
-    log::trace!("{value:02x} -> {address:?} | Writing to SHEILA ({page}, {name})");
+    log::trace!("{value:02x} -> {address:?} | Writing to SHEILA ({page:x}, {name})");
     if address.lo_u8() & 0b1111_0000 == 0x40 && self.use_alt_system_via {
       self.alt_sysvia.borrow_mut().write(address, value);
     }

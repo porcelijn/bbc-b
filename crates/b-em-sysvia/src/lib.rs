@@ -95,7 +95,7 @@ impl Keyboard {
 
   pub fn scan_key(&self) -> bool {
     if self.keycol == 15 {
-//    assert_eq!(self.keyrow, 0);
+      assert_eq!(self.keyrow, 0);
       // this is the exceptional case where MOS1.20 strobes invalid col before
       // probing keys
       return false;
