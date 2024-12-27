@@ -170,10 +170,8 @@ impl<PA: Port, PB: Port> VIA<PA, PB> {
 
   fn update_port_b7(&mut self) {
     if self.acr & Self::ACR_T1_PB7_BIT != 0 {
-      let value = self.iorb;
-      let value = value ^ BIT7; // toggle PB7
-      self.port_b.write(value, BIT7);
-      self.iorb = value;
+      self.iorb ^= BIT7; // toggle PB7
+      self.port_b.write(self.iorb, BIT7);
     }
   }
 
@@ -376,7 +374,7 @@ impl<PA: Port, PB: Port> MemoryBus for VIA<PA, PB> {
         if self.acr & Self::ACR_T1_PB7_BIT != 0 {
           // one shot, pull PB7 low
           self.iorb &= NBIT7;
-          self.port_b.write(0, BIT7);
+          self.port_b.write(self.iorb, BIT7);
         }
         self.clear_ifr_bits(Self::IFR_T1_BIT);
         self.t1_active.set(true);
