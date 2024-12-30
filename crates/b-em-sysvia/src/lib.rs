@@ -31,6 +31,11 @@ impl Sysvia {
   pub fn step(&self, ticks: u32) {
     unsafe { sysvia_poll(self.via, ticks) };
   }
+
+  // vsync signal
+  pub fn set_ca1_level(&mut self, level: bool) {
+    unsafe { sysvia_set_ca1(self.via, level as u32); }
+  }
 }
 
 impl Drop for Sysvia {
@@ -171,6 +176,7 @@ extern {
   fn sysvia_delete(via: *mut Cvia);
   fn sysvia_read(via: *mut Cvia, address: u16) -> u8;
   fn sysvia_write(via: *mut Cvia, address: u16, value: u8);
+  fn sysvia_set_ca1(via: *mut Cvia, level: u32);
   fn sysvia_set_ca2(via: *mut Cvia, level: u32);
   fn sysvia_poll(via: *mut Cvia, cycles: u32);
 }

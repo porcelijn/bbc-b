@@ -10,6 +10,7 @@ use crate::mos6522::{Device, Signal};
 
 pub struct AltVIA {
   pub irq: Rc<Signal>,// shared, hard-wired to other IRQ sources for logic "OR"
+  pub crtc_vsync: Rc<Signal>, // 50Hz CRT flyback
   via: Sysvia,
   micros: u64
 }
@@ -21,6 +22,7 @@ impl AltVIA {
     let b_em = keyboard.borrow().b_em.clone();
     AltVIA {
       irq,
+      crtc_vsync: Rc::new(Signal::new()),
       via: Sysvia::new(b_em, raise_interrupt),
       micros: 0
     }
@@ -36,6 +38,7 @@ impl Clocked for AltVIA {
     assert!(self.micros < us);
     let ticks = 2 * (us - self.micros); // B-em ticks are at 2MHz
     assert!(ticks < u32::MAX.into());
+    self.via.set_ca1_level(self.crtc_vsync.sense());
     self.via.step(ticks as u32);
     self.micros = us;
   }

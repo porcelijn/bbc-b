@@ -106,10 +106,11 @@ impl SheilaPage {
     let acia = RefCell::new(ACIA{});
     let ic32 = Rc::new(IC32::new());
     let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
+    let mut alt_sysvia = AltVIA::new(keyboard);
     system_port_a.crtc_vsync = crtc.vsync.clone(); // connect CA1 to 6845 vsync
+    alt_sysvia.crtc_vsync = crtc.b_em_vsync.clone(); // connect CA1 to vsync duplicate
     let crtc = Rc::new(RefCell::new(crtc));
-    let alt_sysvia = AltVIA::new(keyboard);
-  let irq = alt_sysvia.irq.clone();
+    let irq = alt_sysvia.irq.clone();
     let alt_sysvia = Rc::new(RefCell::new(alt_sysvia));
     let system_port_b = SystemPortB::new(ic32);
     let mut system_via = SystemVIA::new(system_port_a, system_port_b);

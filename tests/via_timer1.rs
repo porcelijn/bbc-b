@@ -9,7 +9,9 @@ use bbc_b::mos6522::alt_via::AltVIA;
 use bbc_b::mos6522::system_via::{SystemPortA, SystemPortB, SystemVIA};
 
 const IORB: Address = Address::from(0);
+const IORA: Address = Address::from(1);
 const DDRB: Address = Address::from(2);
+const DDRA: Address = Address::from(3);
 const T1C_H: Address = Address::from(5);
 const T1L_L: Address = Address::from(6);
 const ACR:   Address = Address::from(11);
@@ -22,7 +24,7 @@ fn timer1_100hz_mine() {
   let ic32 = Rc::new(IC32::new());
   let port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
   let port_b = SystemPortB::new(ic32.clone());
-  let mut via = SystemVIA::new(port_a, port_b);
+  let via = SystemVIA::new(port_a, port_b);
   let irq = via.irq.clone();
   test_timer1_100hz(via, irq);
 }
@@ -133,4 +135,58 @@ fn test_timer1_b7_square_wave<VIA: MemoryBus + Clocked>(mut via: VIA) {
   }
   via.step(401);
   assert_eq!(via.read(IORB), 0b0011_1100); // B7 is clear
+}
+
+#[test]
+fn crtc_vsync_mine() {
+  let keyboard = Rc::new(RefCell::new(Keyboard::new()));
+  let ic32 = Rc::new(IC32::new());
+  let port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
+  let port_b = SystemPortB::new(ic32.clone());
+  let vsync = port_a.crtc_vsync.clone();
+  test_crtc_vsync(SystemVIA::new(port_a, port_b), vsync);
+}
+
+#[test]
+fn crtc_vsync_b_em() {
+  let b_em = AltVIA::new(Rc::new(RefCell::new(Keyboard::new())));
+  let vsync = b_em.crtc_vsync.clone();
+  test_crtc_vsync(b_em, vsync);
+}
+
+fn test_crtc_vsync<VIA: MemoryBus + Clocked>(mut via: VIA, vsync: Rc<Signal>) {
+  assert_eq!(via.read(IFR), 0);
+  vsync.raise(); // i.e. positive edge
+  via.step(1);
+  assert_eq!(via.read(IFR), 0);
+  via.step(2); // neagtive edge
+  assert_eq!(via.read(IFR), 1 << 1); // CA1 is set
+
+  // clear CA1 flag explicitly
+  via.write(IFR, 1 << 1);
+  assert_eq!(via.read(IFR), 0);
+  vsync.raise(); // again
+  via.step(3);
+  assert_eq!(via.read(IFR), 0);
+  via.step(4); // neagtive edge
+  assert_eq!(via.read(IFR), 1 << 1); // CA1 is set
+
+  // clear CA1 flag by reading from register 1 (IRA)
+  via.read(IORA);
+  assert_eq!(via.read(IFR), 0);
+  vsync.raise(); // again
+  via.step(5);
+  assert_eq!(via.read(IFR), 0);
+  via.step(6); // neagtive edge
+  assert_eq!(via.read(IFR), 1 << 1); // CA1 is set
+
+  // clear CA1 flag by writing to register 1 (ORA)
+  via.write(DDRA, 0xFF);
+  via.write(IORA, 0);
+  assert_eq!(via.read(IFR), 0);
+  vsync.raise(); // again
+  via.step(7);
+  assert_eq!(via.read(IFR), 0);
+  via.step(8); // neagtive edge
+  assert_eq!(via.read(IFR), 1 << 1); // CA1 is set
 }

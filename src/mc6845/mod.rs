@@ -10,6 +10,7 @@ use crate::memory::{Address, MemoryBus};
 #[derive(Debug)]
 pub struct CRTC {
   pub vsync: Rc<Signal>,
+  pub b_em_vsync: Rc<Signal>,
   clock_us: u64,
 }
 
@@ -17,8 +18,9 @@ impl CRTC {
   const FIFTY_HERZ: u64 = 20_000;
   pub fn new() -> Self {
     let vsync = Rc::new(Signal::new());
+    let b_em_vsync = Rc::new(Signal::new());
     let clock_us = 0;
-    CRTC { vsync, clock_us }
+    CRTC { vsync, b_em_vsync, clock_us }
   }
 }
 
@@ -40,6 +42,7 @@ impl Clocked for CRTC {
     assert!(self.clock_us < us); // can't go back in time
     if self.clock_us / Self::FIFTY_HERZ != us / Self::FIFTY_HERZ {
       self.vsync.raise();
+      self.b_em_vsync.raise();
     }
     self.clock_us = us;
   }
