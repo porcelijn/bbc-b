@@ -46,13 +46,18 @@ impl Drop for Sysvia {
 }
 
 #[repr(C)]
+struct Matrix {
+  kbdips: u8,
+  bbcmatrix: [[bool; 8]; 10],
+}
+
+#[repr(C)]
 pub struct Keyboard {
   pub keyrow: u32,
   pub keycol: u32,
 
   keypress: Box<Keypress>,
-  kbdips: u8,
-  bbcmatrix: [[bool; 8]; 10],
+  matrix: Matrix,
 }
 
 impl std::fmt::Debug for Keyboard {
@@ -64,17 +69,19 @@ impl std::fmt::Debug for Keyboard {
 impl Keyboard {
   const MAXCOL: u32 = 10;
   pub fn new(keypress: Box<Keypress>) -> Self {
+    let matrix = Matrix {
+      kbdips: 0b0000_0000, bbcmatrix: [[false; 8]; 10]
+    };
     Keyboard {
       keyrow: 0, keycol: 0,
-      keypress,
-      kbdips: 0b0000_0000, bbcmatrix: [[false; 8]; 10]
+      keypress, matrix,
     }
   }
 
   pub fn scan_all(&self) -> bool {
     for col in 0..Self::MAXCOL {
       for row in 1..8 {
-        if self.bbcmatrix[col as usize][row as usize] {
+        if self.matrix.bbcmatrix[col as usize][row as usize] {
           return true;
         }
       }
@@ -85,7 +92,7 @@ impl Keyboard {
   pub fn scan_col(&self) -> bool {
     if self.keycol < Self::MAXCOL {
       for row in 1..8 {
-        if self.bbcmatrix[self.keycol as usize][row as usize] {
+        if self.matrix.bbcmatrix[self.keycol as usize][row as usize] {
           return true;
         }
       }
@@ -101,12 +108,12 @@ impl Keyboard {
       return false;
     }
     assert!(self.keyrow < 8 && self.keycol < Self::MAXCOL);
-    self.bbcmatrix[self.keycol as usize][self.keyrow as usize]
+    self.matrix.bbcmatrix[self.keycol as usize][self.keyrow as usize]
   }
 
   fn scan_dip(&self) -> bool {
     assert!(2 <= self.keycol && self.keycol <= 9);
-    self.kbdips & (1 << (9 - self.keycol)) != 0
+    self.matrix.kbdips & (1 << (9 - self.keycol)) != 0
   }
 
   pub fn update_keys(&mut self) {
@@ -114,7 +121,7 @@ impl Keyboard {
     let row = (key_code & 0b0111_0000) >> 4;
     let col = (key_code & 0b0000_1111) >> 0;
     assert!(row < 8 && col < Self::MAXCOL as u8);
-    self.bbcmatrix[col as usize][row as usize] = pressed;
+    self.matrix.bbcmatrix[col as usize][row as usize] = pressed;
   }
 }
 
