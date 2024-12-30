@@ -7,7 +7,6 @@ pub struct Sysvia {
   state: *mut State, // Pointer owns state, must drop in Rust land!
 }
 
-pub type Keypress = dyn FnMut() -> (u8, bool);
 pub type Interrupt = dyn FnMut(u32);
 
 impl Sysvia {
@@ -64,8 +63,6 @@ impl Matrix {
 pub struct Keyboard {
   pub keyrow: u32,
   pub keycol: u32,
-
-  keypress: Box<Keypress>,
   matrix: Matrix,
 }
 
@@ -77,13 +74,13 @@ impl std::fmt::Debug for Keyboard {
 
 impl Keyboard {
   const MAXCOL: u32 = 10;
-  pub fn new(keypress: Box<Keypress>) -> Self {
+  pub fn new() -> Self {
     let matrix = Matrix {
       bbcmatrix: [[false; 8]; 10]
     };
     Keyboard {
       keyrow: 0, keycol: 0,
-      keypress, matrix,
+      matrix,
     }
   }
 
@@ -123,14 +120,10 @@ impl Keyboard {
   pub fn scan_dip(&self) -> bool {
     assert_eq!(self.keyrow, 0);
     assert!(2 <= self.keycol && self.keycol <= 9);
-    self.scan_key()
+    self.scan_key() // forward to regular matrix
   }
 
-  pub fn update_keys(&mut self) {
-    let (key_code, pressed) = (self.keypress)();
-    let row = (key_code & 0b0111_0000) >> 4;
-    let col = (key_code & 0b0000_1111) >> 0;
-    assert!(row < 8 && col < Self::MAXCOL as u8);
+  pub fn update_key(&mut self, row: u8, col: u8, pressed: bool) {
     self.matrix.write(row, col, pressed);
   }
 
@@ -270,15 +263,14 @@ pub extern fn led_update(led_name: u32 /* led_name_t */, b: bool, ticks: u32) {
 pub extern fn key_paste_poll(state: *mut State) {
   // stick as close to the b-em/src/keyboard.c implementation as possible, but
   // wire to keyboard through callback
-  let keyboard = unsafe { &mut (*state).keyboard };
-  keyboard.borrow_mut().update_keys();
+
+  // FIXME: removed keyboard polling callback
   key_update(state);  
 }
 
 #[allow(unused)]
 unsafe fn characterization_test() {
-  let k = Keyboard::new(Box::new(|| (0x69, false)));
-  let s = State::new(Rc::new(RefCell::new(k)),
+  let s = State::new(Rc::new(RefCell::new(Keyboard::new())),
                      Box::new(|interrupt| {
                        assert_eq!(interrupt, 0);
                      }));
@@ -298,16 +290,7 @@ fn test() {
   // do stuff
   unsafe { characterization_test() };
 
-  let mut seed = 3 * 0x10;
-  let input = move || -> (u8, bool) {
-    let pressed = seed % 3 == 1;
-    let key_code = (seed / 3) & 0b0111_0111;
-    seed += 1;
-    (key_code, pressed)
-  };
-
-  let keyboard = Keyboard::new(Box::new(input));
-
+  let keyboard = Keyboard::new();
   let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
   let has_irq_alias = has_irq.clone();
   let interrupt = move |value| {
@@ -337,15 +320,13 @@ fn test() {
 
 #[test]
 fn alt_via_timer1() {
-  let dummy = Keyboard::new(Box::new(||(0, false)));
-
   let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
   let has_irq_alias = has_irq.clone();
   let interrupt = move |value| {
     has_irq_alias.set(value != 0);
   };
 
-  let via = Sysvia::new(Rc::new(RefCell::new(dummy)), Box::new(interrupt));
+  let via = Sysvia::new(Rc::new(RefCell::new(Keyboard::new())), Box::new(interrupt));
   via.write(6, 0);
   via.write(5, 0); // activate t1
   via.step(200);

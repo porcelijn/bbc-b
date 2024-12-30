@@ -12,7 +12,6 @@ const MAX_COL: u8 = 10;
 #[derive(Debug)]
 pub struct Keyboard {
   matrix: [u8; MAX_COL as usize],
-  hack_key: Rc<Cell<(u8, bool)>>, // for callback
   pub b_em: Rc<RefCell<B_em>>,
 }
 
@@ -22,12 +21,8 @@ impl Keyboard {
   }
 
   pub fn new() -> Self {
-    let hack_key = Rc::new(Cell::new((0, false)));
-    let press = hack_key.clone();
-    // dummy, because we'll poke straight into bbcmatrix 
-    let dummy_keypress = Box::new(move || { press.get() });
-    let b_em = Rc::new(RefCell::new(B_em::new(dummy_keypress)));
-    Keyboard { matrix: [0; MAX_COL as usize], hack_key, b_em }
+    let b_em = Rc::new(RefCell::new(B_em::new()));
+    Keyboard { matrix: [0; MAX_COL as usize], b_em }
   }
 
   fn read(&self, row: u8, col: u8) -> bool {
@@ -55,8 +50,8 @@ impl Keyboard {
     } else {
       self.matrix[col as usize] &= !Self::mask(row);
     }
-    self.hack_key.set((row << 4 | col, value));
-    self.b_em.borrow_mut().update_keys();
+
+    self.b_em.borrow_mut().update_key(row, col, value);
   }
 
   pub fn is_key_pressed(&self, key_code: u8) -> bool {
