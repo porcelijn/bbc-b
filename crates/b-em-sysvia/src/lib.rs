@@ -47,7 +47,6 @@ impl Drop for Sysvia {
 
 #[repr(C)]
 struct Matrix {
-  kbdips: u8,
   bbcmatrix: [[bool; 8]; 10],
 }
 
@@ -80,7 +79,7 @@ impl Keyboard {
   const MAXCOL: u32 = 10;
   pub fn new(keypress: Box<Keypress>) -> Self {
     let matrix = Matrix {
-      kbdips: 0b0000_0000, bbcmatrix: [[false; 8]; 10]
+      bbcmatrix: [[false; 8]; 10]
     };
     Keyboard {
       keyrow: 0, keycol: 0,
@@ -122,8 +121,9 @@ impl Keyboard {
   }
 
   pub fn scan_dip(&self) -> bool {
+    assert_eq!(self.keyrow, 0);
     assert!(2 <= self.keycol && self.keycol <= 9);
-    self.matrix.kbdips & (1 << (9 - self.keycol)) != 0
+    self.scan_key()
   }
 
   pub fn update_keys(&mut self) {
@@ -134,8 +134,14 @@ impl Keyboard {
     self.matrix.write(row, col, pressed);
   }
 
-  pub fn set_dip_switch(&mut self, dips: u8) {
-    self.matrix.kbdips = dips;
+  pub fn set_dip_switch(&mut self, bits: u8) {
+    let row = 0u8;
+    let mut mask = 0b1000_0000u8;
+    for col in 2u8 .. 10u8 {
+      let value = bits & mask != 0;
+      self.matrix.write(row, col, value);
+      mask >>= 1;
+    }
   }
 }
 
