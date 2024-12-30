@@ -51,6 +51,13 @@ struct Matrix {
   bbcmatrix: [[bool; 8]; 10],
 }
 
+impl Matrix {
+  fn read(&self, row: u8, col: u8) -> bool {
+    self.bbcmatrix[col as usize][row as usize]
+  }
+
+}
+
 #[repr(C)]
 pub struct Keyboard {
   pub keyrow: u32,
@@ -81,7 +88,7 @@ impl Keyboard {
   pub fn scan_all(&self) -> bool {
     for col in 0..Self::MAXCOL {
       for row in 1..8 {
-        if self.matrix.bbcmatrix[col as usize][row as usize] {
+        if self.matrix.read(row, col as u8) {
           return true;
         }
       }
@@ -92,7 +99,7 @@ impl Keyboard {
   pub fn scan_col(&self) -> bool {
     if self.keycol < Self::MAXCOL {
       for row in 1..8 {
-        if self.matrix.bbcmatrix[self.keycol as usize][row as usize] {
+        if self.matrix.read(row, self.keycol as u8) {
           return true;
         }
       }
@@ -108,7 +115,7 @@ impl Keyboard {
       return false;
     }
     assert!(self.keyrow < 8 && self.keycol < Self::MAXCOL);
-    self.matrix.bbcmatrix[self.keycol as usize][self.keyrow as usize]
+    self.matrix.read(self.keyrow as u8, self.keycol as u8)
   }
 
   fn scan_dip(&self) -> bool {
