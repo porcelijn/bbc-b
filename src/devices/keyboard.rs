@@ -40,6 +40,9 @@ impl Keyboard {
     self.b_em.borrow_mut().keyrow = row as u32;
     self.b_em.borrow_mut().keycol = col as u32;
     assert_eq!(value, self.b_em.borrow().scan_key());
+    if row == 0 && 2 <= col && col <= 9 {
+      assert_eq!(value, self.b_em.borrow().scan_dip());
+    }
     self.b_em.borrow_mut().keyrow = r; // restore
     self.b_em.borrow_mut().keycol = c; // restore
     value
@@ -99,7 +102,7 @@ impl Keyboard {
   pub fn scan_column(&self, col: u8) -> bool {
     let c = self.b_em.borrow().keycol; // backup
     self.b_em.borrow_mut().keycol = col as u32;
-    let b_em_value =self.b_em.borrow().scan_col();
+    let b_em_value = self.b_em.borrow().scan_col();
     self.b_em.borrow_mut().keycol = c; // restore
  
     if col < MAX_COL {
@@ -150,6 +153,7 @@ impl Keyboard {
       self.write(row, col, value);
       mask >>= 1;
     }
+    self.b_em.borrow_mut().set_dip_switch(bits);
   }
 
   pub const fn decode(key_code: u8) -> (u8, u8) {
@@ -276,10 +280,18 @@ fn press_keyboard() {
     println!("{key_code:x} {row} {col}");
     assert_eq!(kb.read(row, col), false);
     kb.press_key(key_code);
-    let causes_interrupt = row != 0; // SHIFT, CTRL, and dip switches don't IRQ
-    assert_eq!(kb.scan_interrupt(), causes_interrupt);
+    if row == 0 {
+      // SHIFT, CTRL, and dip switches don't IRQ
+      assert_eq!(kb.scan_interrupt(), false);
+      if 2 <= col && col <= 9 {
+        kb.set_dip_switch(1 << (9 - col));
+      }
+    } else {
+      assert_eq!(kb.scan_interrupt(), true);
+    }
     assert_eq!(kb.read(row, col), true);
     kb.release_key(key_code);
+    kb.set_dip_switch(0);
     assert_eq!(kb.scan_interrupt(), false);
     assert_eq!(kb.read(row, col), false);
   }

@@ -56,6 +56,9 @@ impl Matrix {
     self.bbcmatrix[col as usize][row as usize]
   }
 
+  fn write(&mut self, row: u8, col: u8, pressed: bool) {
+    self.bbcmatrix[col as usize][row as usize] = pressed;
+  }
 }
 
 #[repr(C)]
@@ -118,7 +121,7 @@ impl Keyboard {
     self.matrix.read(self.keyrow as u8, self.keycol as u8)
   }
 
-  fn scan_dip(&self) -> bool {
+  pub fn scan_dip(&self) -> bool {
     assert!(2 <= self.keycol && self.keycol <= 9);
     self.matrix.kbdips & (1 << (9 - self.keycol)) != 0
   }
@@ -128,7 +131,11 @@ impl Keyboard {
     let row = (key_code & 0b0111_0000) >> 4;
     let col = (key_code & 0b0000_1111) >> 0;
     assert!(row < 8 && col < Self::MAXCOL as u8);
-    self.matrix.bbcmatrix[col as usize][row as usize] = pressed;
+    self.matrix.write(row, col, pressed);
+  }
+
+  pub fn set_dip_switch(&mut self, dips: u8) {
+    self.matrix.kbdips = dips;
   }
 }
 
