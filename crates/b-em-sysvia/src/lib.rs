@@ -28,6 +28,7 @@ impl Sysvia {
   }
 
   pub fn step(&self, ticks: u32) {
+    key_update(self.state); // Hack: keep ca1 in sync with my own sysvia
     unsafe { sysvia_poll(self.via, ticks) };
   }
 
@@ -97,14 +98,11 @@ impl Keyboard {
   }
 
   pub fn scan_key(&self) -> bool {
-    if self.keycol == 15 {
-      assert_eq!(self.keyrow, 0);
-      // this is the exceptional case where MOS1.20 strobes invalid col before
-      // probing keys
-      return false;
+    if self.keyrow < 8 && self.keycol < Self::MAXCOL {
+      self.matrix.read(self.keyrow as u8, self.keycol as u8)
+    } else {
+      false
     }
-    assert!(self.keyrow < 8 && self.keycol < Self::MAXCOL);
-    self.matrix.read(self.keyrow as u8, self.keycol as u8)
   }
 }
 
