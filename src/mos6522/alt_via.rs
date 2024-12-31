@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use b_em_sysvia::{Interrupt, Sysvia};
+use b_em_sysvia::{Interrupt, Keyboard as Kb, Matrix, Sysvia};
 
 use crate::devices::Clocked;
 use crate::devices::keyboard::Keyboard;
@@ -19,7 +19,15 @@ impl AltVIA {
   pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
     let irq = Rc::new(Signal::new());
     let raise_interrupt = make_interrupt(irq.clone());
-    let b_em = keyboard.borrow().b_em.clone();
+
+    struct KbShim(Rc<RefCell<Keyboard>>);
+    impl Matrix for KbShim {
+      fn read(&self, row: u8, col: u8) -> bool {
+        self.0.borrow().read(row, col)
+      }
+    }
+
+    let b_em = Kb::new(Rc::new(KbShim(keyboard)));
     AltVIA {
       irq,
       crtc_vsync: Rc::new(Signal::new()),

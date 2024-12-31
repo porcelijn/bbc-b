@@ -1,5 +1,4 @@
 use std::rc::Rc;
-use std::cell::RefCell;
 
 // a quasi object shim that delegates to C implementation singleton
 pub struct Sysvia {
@@ -10,7 +9,7 @@ pub struct Sysvia {
 pub type Interrupt = dyn FnMut(u32);
 
 impl Sysvia {
-  pub fn new(keyboard: Rc<RefCell<Keyboard>>, interrupt: Box<Interrupt>) -> Self {
+  pub fn new(keyboard: Keyboard, interrupt: Box<Interrupt>) -> Self {
     let state = Box::new(State::new(keyboard, interrupt));
     let state = Box::into_raw(state);
     let via = unsafe { sysvia_new(state) };
@@ -49,26 +48,15 @@ impl Drop for Sysvia {
   }
 }
 
-#[repr(C)]
-struct Matrix {
-  bbcmatrix: [[bool; 8]; 10],
-}
-
-impl Matrix {
-  fn read(&self, row: u8, col: u8) -> bool {
-    self.bbcmatrix[col as usize][row as usize]
-  }
-
-  fn write(&mut self, row: u8, col: u8, pressed: bool) {
-    self.bbcmatrix[col as usize][row as usize] = pressed;
-  }
+pub trait Matrix {
+  fn read(&self, row: u8, col: u8) -> bool;
 }
 
 #[repr(C)]
 pub struct Keyboard {
   pub keyrow: u32,
   pub keycol: u32,
-  matrix: Matrix,
+  matrix: Rc<dyn Matrix>,
 }
 
 impl std::fmt::Debug for Keyboard {
@@ -79,10 +67,7 @@ impl std::fmt::Debug for Keyboard {
 
 impl Keyboard {
   const MAXCOL: u32 = 10;
-  pub fn new() -> Self {
-    let matrix = Matrix {
-      bbcmatrix: [[false; 8]; 10]
-    };
+  pub fn new(matrix: Rc<dyn Matrix>) -> Self {
     Keyboard {
       keyrow: 0, keycol: 0,
       matrix,
@@ -121,20 +106,6 @@ impl Keyboard {
     assert!(self.keyrow < 8 && self.keycol < Self::MAXCOL);
     self.matrix.read(self.keyrow as u8, self.keycol as u8)
   }
-
-  pub fn update_key(&mut self, row: u8, col: u8, pressed: bool) {
-    self.matrix.write(row, col, pressed);
-  }
-
-  pub fn set_dip_switch(&mut self, bits: u8) {
-    let row = 0u8;
-    let mut mask = 0b1000_0000u8;
-    for col in 2u8 .. 10u8 {
-      let value = bits & mask != 0;
-      self.matrix.write(row, col, value);
-      mask >>= 1;
-    }
-  }
 }
 
 #[repr(C)]
@@ -151,11 +122,11 @@ pub struct State {
 
   via: *mut Cvia,
   interrupt: Box<Interrupt>,
-  keyboard: Rc<RefCell<Keyboard>>,
+  keyboard: Keyboard,
 }
 
 impl State {
-  fn new(keyboard: Rc<RefCell<Keyboard>>, interrupt: Box<Interrupt>) -> Self {
+  fn new(keyboard: Keyboard, interrupt: Box<Interrupt>) -> Self {
     State { ic32: 0, sdbval: 0, sysvia_sdb_out: 0, scrsize: 0,
             via: std::ptr::null_mut(), interrupt,
             keyboard }
@@ -188,10 +159,10 @@ fn key_update(state: *mut State) {
 
   let scan = if ic32 & 8 != 0 {
     /* autoscan mode */
-    keyboard.borrow().scan_all()
+    keyboard.scan_all()
   } else {
     /* scan specific key mode */
-    keyboard.borrow().scan_col()
+    keyboard.scan_col()
   };
 
   unsafe { sysvia_set_ca2(cvia, scan as u32); }
@@ -201,8 +172,8 @@ fn key_update(state: *mut State) {
 pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
   let keyboard = unsafe { &mut (*state).keyboard };
 
-  keyboard.borrow_mut().keyrow = row;
-  keyboard.borrow_mut().keycol = col;
+  keyboard.keyrow = row;
+  keyboard.keycol = col;
 
   key_update(state);
 }
@@ -210,7 +181,7 @@ pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
 #[no_mangle]
 pub extern fn key_is_down(state: *const State) -> bool {
   let keyboard = unsafe { &(*state).keyboard };
-  keyboard.borrow().scan_key()
+  keyboard.scan_key()
 }
 
 /*
@@ -265,8 +236,16 @@ pub extern fn key_paste_poll(state: *mut State) {
 }
 
 #[allow(unused)]
+struct Dummy;
+impl Matrix for Dummy {
+  fn read(&self, r: u8, c: u8) -> bool {
+    (r+c) % 2 == 0
+  }
+}
+
+#[allow(unused)]
 unsafe fn characterization_test() {
-  let s = State::new(Rc::new(RefCell::new(Keyboard::new())),
+  let s = State::new(Keyboard::new(Rc::new(Dummy)),
                      Box::new(|interrupt| {
                        assert_eq!(interrupt, 0);
                      }));
@@ -286,14 +265,14 @@ fn test() {
   // do stuff
   unsafe { characterization_test() };
 
-  let keyboard = Keyboard::new();
+  let keyboard = Keyboard::new(Rc::new(Dummy));
   let has_irq = std::rc::Rc::new(std::cell::Cell::new(false));
   let has_irq_alias = has_irq.clone();
   let interrupt = move |value| {
     has_irq_alias.set(value != 0);
   };
 
-  let sysvia = Sysvia::new(Rc::new(RefCell::new(keyboard)), Box::new(interrupt));
+  let sysvia = Sysvia::new(keyboard, Box::new(interrupt));
   let v = sysvia.read(0);
   assert_eq!(v, 0xFF); // via_read_null()
   sysvia.write(0, 1);
@@ -322,7 +301,7 @@ fn alt_via_timer1() {
     has_irq_alias.set(value != 0);
   };
 
-  let via = Sysvia::new(Rc::new(RefCell::new(Keyboard::new())), Box::new(interrupt));
+  let via = Sysvia::new(Keyboard::new(Rc::new(Dummy)), Box::new(interrupt));
   via.write(6, 0);
   via.write(5, 0); // activate t1
   via.step(200);

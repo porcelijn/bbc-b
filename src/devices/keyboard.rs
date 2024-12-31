@@ -1,8 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use b_em_sysvia::Keyboard as B_em;
-
 // The keyboard consists of 8 rows, 10 columns of wires
 // bottom row (a. o. SHIFT, CTRL) does not cause interrupts
 // bottom row 2-9 is wired to a dip switch that controls boot options
@@ -12,7 +7,6 @@ const MAX_COL: u8 = 10;
 #[derive(Debug)]
 pub struct Keyboard {
   matrix: [u8; MAX_COL as usize],
-  pub b_em: Rc<RefCell<B_em>>,
 }
 
 impl Keyboard {
@@ -21,22 +15,15 @@ impl Keyboard {
   }
 
   pub fn new() -> Self {
-    let b_em = Rc::new(RefCell::new(B_em::new()));
-    Keyboard { matrix: [0; MAX_COL as usize], b_em }
+    Keyboard { matrix: [0; MAX_COL as usize] }
   }
 
-  fn read(&self, row: u8, col: u8) -> bool {
+  pub fn read(&self, row: u8, col: u8) -> bool {
     // row connects to System VIA PA4..PA6 through IC2 data selector (74LS251)
     // col connects to System VIA PA0..PA3 through IC1 synch bin ctr (74LS163)
     assert!(row < 8 && col < MAX_COL);
     let value = self.matrix[col as usize] & Self::mask(row) != 0;
     log::trace!("Keyboard: {row}, {col} = {value}");
-    let (r, c) = (self.b_em.borrow().keyrow, self.b_em.borrow().keycol); // backup
-    self.b_em.borrow_mut().keyrow = row as u32;
-    self.b_em.borrow_mut().keycol = col as u32;
-    assert_eq!(value, self.b_em.borrow().scan_key());
-    self.b_em.borrow_mut().keyrow = r; // restore
-    self.b_em.borrow_mut().keycol = c; // restore
     value
   }
 
@@ -47,8 +34,6 @@ impl Keyboard {
     } else {
       self.matrix[col as usize] &= !Self::mask(row);
     }
-
-    self.b_em.borrow_mut().update_key(row, col, value);
   }
 
   pub fn is_key_pressed(&self, key_code: u8) -> bool {
@@ -92,35 +77,25 @@ impl Keyboard {
 
   // if true, send CA1 to system VIA (ic32 KB autoscan disabled)
   pub fn scan_column(&self, col: u8) -> bool {
-    let c = self.b_em.borrow().keycol; // backup
-    self.b_em.borrow_mut().keycol = col as u32;
-    let b_em_value = self.b_em.borrow().scan_col();
-    self.b_em.borrow_mut().keycol = c; // restore
- 
     if col < MAX_COL {
       // mask out row 0 (SHIFT, CRTL, dip switches)
       let result = self.matrix[col as usize] & 0b1111_1110 != 0;
-      assert_eq!(result, b_em_value);
       return result;
     }
 
     // .loopKeyboardColumns (MOS 0xFE03)
     // selects a non-existent keyboard column 15 (0-9 only!)
 //  assert_eq!(col, 15);
-    assert!( ! b_em_value);
     false
   }
 
   // if true, send CA1 to system VIA (ic32 KB autoscan enabled)
   pub fn scan_interrupt(&self) -> bool {
-    let b_em_value = self.b_em.borrow().scan_all();
     for col in 0 .. MAX_COL {
       if self.scan_column(col) {
-        assert!(b_em_value);
         return true;
       }
     }
-    assert!( ! b_em_value);
     false
   }
 
@@ -145,7 +120,6 @@ impl Keyboard {
       self.write(row, col, value);
       mask >>= 1;
     }
-    self.b_em.borrow_mut().set_dip_switch(bits);
   }
 
   pub const fn decode(key_code: u8) -> (u8, u8) {
