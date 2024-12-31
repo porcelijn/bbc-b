@@ -122,12 +122,6 @@ impl Keyboard {
     self.matrix.read(self.keyrow as u8, self.keycol as u8)
   }
 
-  pub fn scan_dip(&self) -> bool {
-    assert_eq!(self.keyrow, 0);
-    assert!(2 <= self.keycol && self.keycol <= 9);
-    self.scan_key() // forward to regular matrix
-  }
-
   pub fn update_key(&mut self, row: u8, col: u8, pressed: bool) {
     self.matrix.write(row, col, pressed);
   }
@@ -216,11 +210,7 @@ pub extern fn key_scan(state: *mut State, row: u32, col: u32) {
 #[no_mangle]
 pub extern fn key_is_down(state: *const State) -> bool {
   let keyboard = unsafe { &(*state).keyboard };
-  if keyboard.borrow().keyrow == 0 && keyboard.borrow().keycol >= 2 && keyboard.borrow().keycol <= 9 {
-    keyboard.borrow().scan_dip()
-  } else {
-    keyboard.borrow().scan_key()
-  }
+  keyboard.borrow().scan_key()
 }
 
 /*

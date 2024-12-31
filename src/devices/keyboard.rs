@@ -35,9 +35,6 @@ impl Keyboard {
     self.b_em.borrow_mut().keyrow = row as u32;
     self.b_em.borrow_mut().keycol = col as u32;
     assert_eq!(value, self.b_em.borrow().scan_key());
-    if row == 0 && 2 <= col && col <= 9 {
-      assert_eq!(value, self.b_em.borrow().scan_dip());
-    }
     self.b_em.borrow_mut().keyrow = r; // restore
     self.b_em.borrow_mut().keycol = c; // restore
     value
