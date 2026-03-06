@@ -41,7 +41,7 @@ fn main() {
     keyboard.set_dip_switch(0b0000_0101); // MODE 2, 16 colours
     let keyboard = Rc::new(RefCell::new(keyboard));
     let mut sheila = SheilaPage::new(keyboard.clone());
-    sheila.use_alt_system_via = false; //true;
+    sheila.use_alt_system_via = true;
     let irq_level = sheila.irq.clone();
     let mut clocked_devices: ClockedDevices = sheila.get_clocked_devices();
     mem.add_backend(SheilaPage::page(), Box::new(sheila));
@@ -50,6 +50,7 @@ fn main() {
     // and translate to STDOUT
     //let break_oswrch = stop_at::<0xFFEE>;
     let break_oswrch = stop_at::<0xE0A4>; // Basic bypasses vectored OSWRCH entry
+    let break_osfile = stop_at::<0xFFDD>;
     let mut cpu = CPU::new();
     cpu.irq_level = irq_level;
     cpu.handle_rst(&mut mem);
@@ -63,6 +64,23 @@ fn main() {
     loop {
         if break_oswrch(&cpu, &*mem.borrow()) {
             vdu_to_terminal(cpu.registers.a);
+        }
+        if break_osfile(&cpu, &*mem.borrow()) {
+            cpu.trace(&*mem.borrow());
+            let regs = &cpu.registers;
+            if regs.a == 0xFF {
+                let osfileblockstart = Address::from(0x02ee);
+                let mut address = osfileblockstart;
+                address.inc_by(regs.x);
+                println!("Load {address:?}");
+                let s = bbc_b::memory::slice(&*mem.borrow(), address, 0x12);
+                for b in s {
+                    print!("{b:02x} ");
+                }
+                println!();
+                // 00 00 | 00 00 00 00 | 00 ff 04 ff | 03 00 00 00 | 00 00 00 00
+            }
+            return;
         }
         cpu.step(&mut *mem.borrow_mut());
         for cd in clocked_devices.iter() {

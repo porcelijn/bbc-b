@@ -95,7 +95,7 @@ impl CPU {
     }
 
     #[allow(unused)]
-    fn trace(&self, memory: &dyn MemoryBus) {
+    pub fn trace(&self, memory: &dyn MemoryBus) {
         let address = self.registers.pc;
         let operand = &slice(memory, address, 3);
         let disassembly = disassemble_with_address(address, operand);

@@ -1,5 +1,6 @@
 pub mod ic32;
 pub mod keyboard;
+pub mod video_ula;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -7,6 +8,7 @@ use std::vec::Vec;
 
 use ic32::IC32;
 use keyboard::Keyboard;
+use video_ula::VideoULA;
 
 use crate::mc6845::CRTC;
 use crate::memory::{Address, MemoryBus};
@@ -98,6 +100,7 @@ pub trait DevicePage<const PAGE: u8>: MemoryBus {
 pub struct SheilaPage {
     crtc: Rc<RefCell<CRTC>>,
     acia: RefCell<ACIA>,
+    video_ula: RefCell<VideoULA>,
     alt_sysvia: Rc<RefCell<AltVIA>>,
     system_via: Rc<RefCell<SystemVIA>>,
     user_via: RefCell<UserVIA>,
@@ -110,6 +113,7 @@ impl SheilaPage {
     pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
         let crtc = CRTC::new();
         let acia = RefCell::new(ACIA {});
+        let video_ula = RefCell::new(VideoULA::new());
         let ic32 = Rc::new(IC32::new());
         let mut system_port_a = SystemPortA::new(ic32.clone(), keyboard.clone());
         let mut alt_sysvia = AltVIA::new(keyboard);
@@ -129,6 +133,7 @@ impl SheilaPage {
         SheilaPage {
             crtc,
             acia,
+            video_ula,
             alt_sysvia,
             system_via,
             user_via,
@@ -156,6 +161,7 @@ impl SheilaPage {
                     &self.acia
                 }
             }
+            0x20 => &self.video_ula,
             //...
             0x40 | 0x50 => &*self.system_via,
             0x60 | 0x70 => &self.user_via,

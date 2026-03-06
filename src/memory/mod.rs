@@ -157,6 +157,5 @@ fn page_dispatcher() {
     memory.add_backend(SheilaPage::page(), Box::new(sheila));
     let addr = Address::from(0xFE00);
     memory.write(addr, 42);
-    //assert_eq!(memory.read(addr), 42); // No, we're not seeing what we just wrote!
-    assert_eq!(memory.read(addr), 0); // instead we get back bogus data
+    assert_eq!(memory.read(addr), 42 & 0x0F);
 }
