@@ -13,78 +13,84 @@ use crate::devices::Clocked;
 use crate::memory::{Address, MemoryBus};
 
 pub struct KeyboardBuffer {
-  rx: Receiver<u8>,
+    rx: Receiver<u8>,
 }
 
 impl KeyboardBuffer {
-  pub fn new() -> Self {
-    let (tx, rx) = mpsc::channel::<u8>();
-    thread::spawn(move || loop {
-      let stdin = io::stdin();
-      if let Some(byte) = stdin.bytes().next() {
-        let byte = byte.unwrap();
-        tx.send(byte).unwrap();
-      } else {
-        break;
-      }
-    });
+    pub fn new() -> Self {
+        let (tx, rx) = mpsc::channel::<u8>();
+        thread::spawn(move || loop {
+            let stdin = io::stdin();
+            if let Some(byte) = stdin.bytes().next() {
+                let byte = byte.unwrap();
+                tx.send(byte).unwrap();
+            } else {
+                break;
+            }
+        });
 
-    KeyboardBuffer{ rx }
-  }
-
-  pub fn try_read(&self) -> Option<u8> {
-    match self.rx.try_recv() {
-      Ok(key) => Some(key),
-      Err(TryRecvError::Empty) => None,
-      Err(TryRecvError::Disconnected) => panic!("disconnected"),
+        KeyboardBuffer { rx }
     }
-  }
+
+    pub fn try_read(&self) -> Option<u8> {
+        match self.rx.try_recv() {
+            Ok(key) => Some(key),
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Disconnected) => panic!("disconnected"),
+        }
+    }
 }
 
-pub struct Screen{
-  screen: Mode4,
-  memory: Rc<RefCell<dyn MemoryBus>>,
-  cycles: u64,
+pub struct Screen {
+    screen: Mode4,
+    memory: Rc<RefCell<dyn MemoryBus>>,
+    cycles: u64,
 }
 
 impl Screen {
-  pub fn new(title: &str, memory: Rc<RefCell<dyn MemoryBus>>) -> Self {
-    let screen = Mode4::new(title);
-    Screen { screen, memory, cycles: 0 }
-  }
-
-  pub fn try_read(&self) -> Option<u8> {
-    let keys = self.screen.get_keys();
-    if keys.len() == 0 {
-      None
-    } else {
-      Some(keys[0]) // return first key, ignore rest (TODO)
+    pub fn new(title: &str, memory: Rc<RefCell<dyn MemoryBus>>) -> Self {
+        let screen = Mode4::new(title);
+        Screen {
+            screen,
+            memory,
+            cycles: 0,
+        }
     }
-  }
 
-  pub fn blit(&mut self) {
-// FIXME: let 6845 decide which memory to read
-//  let startup_options = Address::from(0x028F);
-//  let vdu_current_screen_mode = Address::from(0x0355);
-    let vdu_start_screen_address_high_byte = Address::from(0x034E);
-    let start_hi = self.memory.borrow().read(vdu_start_screen_address_high_byte);
-    let from = Address::from_le_bytes(0, start_hi);
-    let to = Address::from(0x8000);
-    let memory = self.memory.borrow();
-    let vram = memory.try_slice(from, to);
-    let vram = vram.expect("Could not get VRAM slice");
-    self.screen.blit(vram);
-  }
+    pub fn try_read(&self) -> Option<u8> {
+        let keys = self.screen.get_keys();
+        if keys.len() == 0 {
+            None
+        } else {
+            Some(keys[0]) // return first key, ignore rest (TODO)
+        }
+    }
+
+    pub fn blit(&mut self) {
+        // FIXME: let 6845 decide which memory to read
+        //  let startup_options = Address::from(0x028F);
+        //  let vdu_current_screen_mode = Address::from(0x0355);
+        let vdu_start_screen_address_high_byte = Address::from(0x034E);
+        let start_hi = self
+            .memory
+            .borrow()
+            .read(vdu_start_screen_address_high_byte);
+        let from = Address::from_le_bytes(0, start_hi);
+        let to = Address::from(0x8000);
+        let memory = self.memory.borrow();
+        let vram = memory.try_slice(from, to);
+        let vram = vram.expect("Could not get VRAM slice");
+        self.screen.blit(vram);
+    }
 }
 
 impl Clocked for Screen {
-  fn step(&mut self, us: u64) {
-    const REFRESH: u64 = 20000; // 50Hz
-    if self.cycles / REFRESH < us / REFRESH {
-      self.blit();
-      self.screen.show();
+    fn step(&mut self, us: u64) {
+        const REFRESH: u64 = 20000; // 50Hz
+        if self.cycles / REFRESH < us / REFRESH {
+            self.blit();
+            self.screen.show();
+        }
+        self.cycles = us;
     }
-    self.cycles = us;
-  }
 }
-

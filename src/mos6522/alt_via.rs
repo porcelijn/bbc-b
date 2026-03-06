@@ -3,70 +3,72 @@ use std::rc::Rc;
 
 use b_em_sysvia::{Interrupt, Keyboard as Kb, Matrix, Sysvia};
 
-use crate::devices::Clocked;
 use crate::devices::keyboard::Keyboard;
+use crate::devices::Clocked;
 use crate::memory::{Address, MemoryBus};
 use crate::mos6522::{Device, Signal};
 
 pub struct AltVIA {
-  pub irq: Rc<Signal>,// shared, hard-wired to other IRQ sources for logic "OR"
-  pub crtc_vsync: Rc<Signal>, // 50Hz CRT flyback
-  via: Sysvia,
-  micros: u64
+    pub irq: Rc<Signal>, // shared, hard-wired to other IRQ sources for logic "OR"
+    pub crtc_vsync: Rc<Signal>, // 50Hz CRT flyback
+    via: Sysvia,
+    micros: u64,
 }
 
 impl AltVIA {
-  pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
-    let irq = Rc::new(Signal::new());
-    let raise_interrupt = make_interrupt(irq.clone());
+    pub fn new(keyboard: Rc<RefCell<Keyboard>>) -> Self {
+        let irq = Rc::new(Signal::new());
+        let raise_interrupt = make_interrupt(irq.clone());
 
-    struct KbShim(Rc<RefCell<Keyboard>>);
-    impl Matrix for KbShim {
-      fn read(&self, row: u8, col: u8) -> bool {
-        self.0.borrow().read(row, col)
-      }
-    }
+        struct KbShim(Rc<RefCell<Keyboard>>);
+        impl Matrix for KbShim {
+            fn read(&self, row: u8, col: u8) -> bool {
+                self.0.borrow().read(row, col)
+            }
+        }
 
-    let b_em = Kb::new(Rc::new(KbShim(keyboard)));
-    AltVIA {
-      irq,
-      crtc_vsync: Rc::new(Signal::new()),
-      via: Sysvia::new(b_em, raise_interrupt),
-      micros: 0
+        let b_em = Kb::new(Rc::new(KbShim(keyboard)));
+        AltVIA {
+            irq,
+            crtc_vsync: Rc::new(Signal::new()),
+            via: Sysvia::new(b_em, raise_interrupt),
+            micros: 0,
+        }
     }
-  }
 }
 
 impl Device for AltVIA {
-  fn name(&self) -> &'static str { "B-em System VIA" }
+    fn name(&self) -> &'static str {
+        "B-em System VIA"
+    }
 }
 
 impl Clocked for AltVIA {
-  fn step(&mut self, us: u64) {
-    assert!(self.micros < us);
-    let ticks = 2 * (us - self.micros); // B-em ticks are at 2MHz
-    assert!(ticks < u32::MAX.into());
-    self.via.set_ca1_level(self.crtc_vsync.sense());
-    self.via.step(ticks as u32);
-    self.micros = us;
-  }
+    fn step(&mut self, us: u64) {
+        assert!(self.micros < us);
+        let ticks = 2 * (us - self.micros); // B-em ticks are at 2MHz
+        assert!(ticks < u32::MAX.into());
+        self.via.set_ca1_level(self.crtc_vsync.sense());
+        self.via.step(ticks as u32);
+        self.micros = us;
+    }
 }
 
 impl MemoryBus for AltVIA {
-  fn read(&self, address: Address) -> u8 {
-    self.via.read(address.to_u16())
-  }
+    fn read(&self, address: Address) -> u8 {
+        self.via.read(address.to_u16())
+    }
 
-  fn write(&mut self, address: Address, value: u8) {
-    self.via.write(address.to_u16(), value);
-  }
+    fn write(&mut self, address: Address, value: u8) {
+        self.via.write(address.to_u16(), value);
+    }
 }
 
 fn make_interrupt(irq: Rc<Signal>) -> Box<Interrupt> {
-  Box::new(move | value | {
-    if value != 0 {
-      log::trace!("AltVIA: interrupt {value}");
-      irq.raise();
-    }
-  })
+    Box::new(move |value| {
+        if value != 0 {
+            log::trace!("AltVIA: interrupt {value}");
+            irq.raise();
+        }
+    })
 }
