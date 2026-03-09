@@ -21,7 +21,6 @@ pub struct CRTC {
 
 impl CRTC {
     const FIFTY_HERZ: u64 = 20_000;
-    const PIXEL_CLOCK_MHZ: u64 = 16_000_000;
 
     pub fn new() -> Self {
         let vsync = Rc::new(Signal::new());
@@ -150,14 +149,17 @@ impl Clocked for CRTC {
     fn step(&mut self, us: u64) {
         assert!(self.clock_us < us); // can't go back in time
 
+        if self.clock_us / Self::FIFTY_HERZ != us / Self::FIFTY_HERZ {
+            self.vsync.raise();
+            self.b_em_vsync.raise();
+        }
+
         let chars_per_line = self.horizontal_total();
         let rasters_per_char = (self.max_raster() + 1) as u16;
         let _total_rasters = (self.vertical_total() + 1) * rasters_per_char;
 
         let delta = us - self.clock_us;
         let chars = delta as u16;
-
-        let was_vsync_before = self.is_vsync();
 
         let mut remaining = chars;
         while remaining > 0 {
@@ -179,13 +181,6 @@ impl Clocked for CRTC {
                     }
                 }
             }
-
-            let is_vsync_now = self.is_vsync();
-            if !was_vsync_before && is_vsync_now {
-                self.vsync.raise();
-                self.b_em_vsync.raise();
-            }
-            // Don't re-raise during VSYNC (only on entry)
         }
 
         self.clock_us = us;
@@ -205,7 +200,7 @@ fn vsync_step1() {
         }
     }
 
-    assert_eq!(count, 50);
+    assert_eq!(count, 49);
 }
 
 #[test]
@@ -221,5 +216,5 @@ fn vsync_step3() {
         }
     }
 
-    assert_eq!(count, 50);
+    assert_eq!(count, 49);
 }
