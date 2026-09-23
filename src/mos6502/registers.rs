@@ -110,7 +110,7 @@ impl StackPointer {
         self.0
     }
 
-    pub fn borrow_mut(&mut self) -> &mut u8 {
+    pub const fn borrow_mut(&mut self) -> &mut u8 {
         &mut self.0
     }
 
@@ -147,6 +147,31 @@ impl Registers {
             p: status,
             pc: address,
             s: stack_pointer,
+        }
+    }
+
+    pub const fn value<const FROM: char>(&self) -> u8 {
+        match FROM {
+            'a' | 'A' => self.a,
+            'x' | 'X' => self.x,
+            'y' | 'Y' => self.y,
+            's' | 'S' => self.s.to_u8(),
+            'p' | 'P' => {
+                // B is 0 when pushed by interrupts (NMI and IRQ) and 1 when pushed by
+                // instructions (BRK and PHP).
+                Status::get_mask::<'B'>() | self.p.to_u8()
+            },
+             _ => unimplemented!(),
+        }
+    }
+
+    pub const fn reference<const TO: char>(&mut self) -> &mut u8 {
+        match TO {
+            'a' | 'A' => &mut self.a,
+            'x' | 'X' => &mut self.x,
+            'y' | 'Y' => &mut self.y,
+            's' | 'S' => self.s.borrow_mut(),
+            _ => unimplemented!(),
         }
     }
 }

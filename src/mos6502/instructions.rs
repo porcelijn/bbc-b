@@ -488,12 +488,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    let lhs = match REGISTER {
-        'a' | 'A' => registers.a,
-        'x' | 'X' => registers.x,
-        'y' | 'Y' => registers.y,
-        _ => unimplemented!(),
-    };
+    let lhs = registers.value::<REGISTER>();
     let rhs = AM::get_value(registers, memory);
     const CARRY: bool = true;
 
@@ -656,14 +651,8 @@ fn load<const REGISTER: char, AM: UseMode + UseValue>(
     memory: &mut dyn MemoryBus,
 ) {
     let value = AM::get_value(registers, memory);
-    let register_ref: &mut u8 = match REGISTER {
-        'a' | 'A' => &mut registers.a,
-        'x' | 'X' => &mut registers.x,
-        'y' | 'Y' => &mut registers.y,
-        _ => unimplemented!(),
-    };
     registers.p.set_nz_from_u8(value);
-    *register_ref = value;
+    *registers.reference::<REGISTER>() = value;
     registers.pc.inc_by(AM::get_size());
 }
 
@@ -671,28 +660,9 @@ fn transfer<const FROM: char, const TO: char, AM: UseMode>(
     registers: &mut Registers,
     _: &mut dyn MemoryBus,
 ) {
-    const fn value<const FROM: char>(registers: &Registers) -> u8 {
-        match FROM {
-            'a' | 'A' => registers.a,
-            'x' | 'X' => registers.x,
-            'y' | 'Y' => registers.y,
-            's' | 'S' => registers.s.to_u8(),
-            _ => unimplemented!(),
-        }
-    }
-
-    let value = value::<FROM>(registers);
-
-    let reference = match TO {
-        'a' | 'A' => &mut registers.a,
-        'x' | 'X' => &mut registers.x,
-        'y' | 'Y' => &mut registers.y,
-        's' | 'S' => registers.s.borrow_mut(),
-        _ => unimplemented!(),
-    };
-
+    let value = registers.value::<FROM>();
     registers.p.set_nz_from_u8(value);
-    *reference = value;
+    *registers.reference::<TO>() = value;
     registers.pc.inc_by(AM::get_size());
 }
 
@@ -700,18 +670,7 @@ fn push_register<const REGISTER: char, AM: UseMode>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    const fn value<const REGISTER: char>(registers: &Registers) -> u8 {
-        match REGISTER {
-            'a' | 'A' => registers.a,
-            'p' | 'P' => {
-                // B is 0 when pushed by interrupts (NMI and IRQ) and 1 when pushed by
-                // instructions (BRK and PHP).
-                Status::get_mask::<'B'>() | registers.p.to_u8()
-            }
-            _ => unimplemented!(),
-        }
-    }
-    let value = value::<REGISTER>(registers);
+    let value = registers.value::<REGISTER>();
     if REGISTER == 'p' || REGISTER == 'P' {
         //println!("{:b} == {:b}", value ,0b00010000| registers.p.to_u8());
         assert_eq!(value, 0b00010000 | registers.p.to_u8());
@@ -740,16 +699,7 @@ fn store<const REGISTER: char, AM: UseMode + UseAddress>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    const fn value<const REGISTER: char>(registers: &Registers) -> u8 {
-        match REGISTER {
-            'a' | 'A' => registers.a,
-            'x' | 'X' => registers.x,
-            'y' | 'Y' => registers.y,
-            _ => unimplemented!(),
-        }
-    }
-
-    let value = value::<REGISTER>(registers);
+    let value = registers.value::<REGISTER>();
     let address = AM::get_address(registers, memory);
     memory.write(address, value);
     registers.pc.inc_by(AM::get_size());
