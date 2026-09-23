@@ -150,7 +150,7 @@ impl Registers {
         }
     }
 
-    pub const fn value<const FROM: char>(&self) -> u8 {
+    pub const fn get<const FROM: char>(&self) -> u8 {
         match FROM {
             'a' | 'A' => self.a,
             'x' | 'X' => self.x,
@@ -165,12 +165,12 @@ impl Registers {
         }
     }
 
-    pub const fn reference<const TO: char>(&mut self) -> &mut u8 {
+    pub const fn set<const TO: char>(&mut self, value: u8) {
         match TO {
-            'a' | 'A' => &mut self.a,
-            'x' | 'X' => &mut self.x,
-            'y' | 'Y' => &mut self.y,
-            's' | 'S' => self.s.borrow_mut(),
+            'a' | 'A' => self.a = value,
+            'x' | 'X' => self.x = value,
+            'y' | 'Y' => self.y = value,
+            's' | 'S' => *self.s.borrow_mut() = value,
             _ => unimplemented!(),
         }
     }

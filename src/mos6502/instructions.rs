@@ -488,7 +488,7 @@ fn compare<const REGISTER: char, AM: UseMode + UseValue>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    let lhs = registers.value::<REGISTER>();
+    let lhs = registers.get::<REGISTER>();
     let rhs = AM::get_value(registers, memory);
     const CARRY: bool = true;
 
@@ -652,7 +652,7 @@ fn load<const REGISTER: char, AM: UseMode + UseValue>(
 ) {
     let value = AM::get_value(registers, memory);
     registers.p.set_nz_from_u8(value);
-    *registers.reference::<REGISTER>() = value;
+    registers.set::<REGISTER>(value);
     registers.pc.inc_by(AM::get_size());
 }
 
@@ -660,9 +660,9 @@ fn transfer<const FROM: char, const TO: char, AM: UseMode>(
     registers: &mut Registers,
     _: &mut dyn MemoryBus,
 ) {
-    let value = registers.value::<FROM>();
+    let value = registers.get::<FROM>();
     registers.p.set_nz_from_u8(value);
-    *registers.reference::<TO>() = value;
+    registers.set::<TO>(value);
     registers.pc.inc_by(AM::get_size());
 }
 
@@ -670,7 +670,7 @@ fn push_register<const REGISTER: char, AM: UseMode>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    let value = registers.value::<REGISTER>();
+    let value = registers.get::<REGISTER>();
     if REGISTER == 'p' || REGISTER == 'P' {
         //println!("{:b} == {:b}", value ,0b00010000| registers.p.to_u8());
         assert_eq!(value, 0b00010000 | registers.p.to_u8());
@@ -699,7 +699,7 @@ fn store<const REGISTER: char, AM: UseMode + UseAddress>(
     registers: &mut Registers,
     memory: &mut dyn MemoryBus,
 ) {
-    let value = registers.value::<REGISTER>();
+    let value = registers.get::<REGISTER>();
     let address = AM::get_address(registers, memory);
     memory.write(address, value);
     registers.pc.inc_by(AM::get_size());
